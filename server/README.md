@@ -26,6 +26,7 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
 
 ## Project Structure
 
+```bash
 . \
 ├── app \
 │   ├── adapters \
@@ -88,6 +89,7 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
 ├── Dockerfile # File to build the docker image. \
 ├── .dockerignore # Files to ignore when building the docker image. \
 └── requirements.txt # Python dependencies. \
+```
 
 ## Pre-requisites
 
