@@ -1,3 +1,15 @@
+"""
+This module contains a function to raise an 
+HTTPException and log the error
+when an exception occurs in the application.
+It is used to handle exceptions in a consistent
+way across the application.
+The function takes an exception and a logger 
+instance as arguments,
+logs the error message, and raises an HTTPException
+with a 500 status code.
+The logger instance is used to log the error message.
+"""
 from logging import Logger
 from fastapi import HTTPException, status
 

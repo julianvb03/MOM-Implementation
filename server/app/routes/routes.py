@@ -6,7 +6,7 @@ from app.adapters.user_service import UserService
 from app.auth.auth import auth_handler
 from app.config.limiter import limiter
 from app.config.logging import logger
-from app.dtos.home_routing_dto import ResponseError
+from app.dtos.general_dtos import ResponseError
 from app.dtos.user_dto import UserDto, UserLoginResponse
 from app.utils.exceptions import raise_exception
 from fastapi import APIRouter, HTTPException, Request, status, Depends

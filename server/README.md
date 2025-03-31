@@ -25,29 +25,59 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
 
 . \
 ├── app \
+│   ├── adapters \
+│   │   ├── __init__.py # Adapters initialization. \
+│   │   ├── db.py # Database interface file. \
+│   │   ├── factory.py # Database factory file. \
+│   │   ├── user_repository.py # User repository interface file. \
+│   │   └── user_service.py # User service interface file. \
 │   ├── auth \
 │   │   ├── __init__.py # Authentication initialization. \
 │   │   └── auth.py # Authentication handling file. \
 │   ├── config \
 │   │   ├── __init__.py # Configuration initialization. \
-│   │   ├── database.py # Database handling file. \
+│   │   ├── db.py # Database handling file. \
 │   │   ├── env.py # Environment variables handling file. \
+│   │   ├── logging.py # Logger handling file. \
 │   │   └── limiter.py # Rate limiter handling file. \
-│   ├── MOM \    
 │   ├── dtos \
+│   │   │   ├── admin \
+│   │   │   │   ├── __init__.py # Admin initialization. \
+│   │   │   │   ├── mom_management_dto.py # MOM management DTO file. \
+│   │   │   │   └── user_management_dto.py # User management DTO file. \
 │   │   ├── __init__.py # Models initialization. \
-│   │   ├── home_routing_dto.py # Database models file. \
-│   ├── routes \     
+│   │   ├── general_dtos.py # General DTO file. \
+│   │   ├── mom_dto.py # MOM DTO file. \
+│   │   └── user_dto.py # User DTO file. \
+│   ├── exceptions \
+│   │   ├── __init__.py # Exceptions initialization. \
+│   │   └── database_exceptions.py # Database exceptions file. \
+│   ├── models \
+│   │   └── user.py # User model file. \
+│   ├── MOM \    
+│   ├── repositories \
+│   │   ├── __init__.py # Repositories initialization. \
+│   │   └── user_repository.py # User repository file. \
+│   ├── services \
+│   │   ├── __init__.py # Services initialization. \
+│   │   └── user_service.py # User service file. \
+│   ├── routes \  
+│   │   ├── admin \
+│   │   │   ├── mom_management \
+│   │   │   │   ├── __init__.py # MOM management initialization. \
+│   │   │   │   └── routes.py # MOM management routes file. \
+│   │   │   ├── __init__.py # Admin initialization. \
+│   │   │   └── routes.py # Admin routes file for user handling. \
+│   │   ├── mom \
+│   │   │   ├── __init__.py # MOM initialization. \
+│   │   │   └── routes.py # MOM interaction routes file. \
+│   │   ├── __init__.py # Routes initialization. \   
 │   │   └── routes.py # Routes file. \      
 │   ├── utils \
 │   │   ├── __init__.py # Utils initialization. \
-│   │   ├── crud.py # CRUD handling file. \
-│   │   └── utils.py # Utils handling file. \
-│   ├── tests \
-│   │   ├── routes \
-│   │   │   ├── __init__.py # Tests initialization. \
-│   │   │   └── test.py # Tests for home routes. \
-│   │   └── __init__.py # Tests initialization. \
+│   │   ├── db.py # Database initialization file. \
+│   │   └── exceptions.py # Exception handling file. \
+│   ├── tests # Tests folder. \
 │   ├── __init__.py # API initialization. \
 │   └── app.py # API routes and methods. \
 ├── .env.example # Environment variables example. \
@@ -70,7 +100,12 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
 3. **Virtual Environment Setup (Optional)**: setup a python venv if desired `python -m  venv .venv` and activate it `.venv\Scripts\activate` in Windows or `source .venv\bin\activate` in Linux or Mac.
 4. **Dependencies Installation**: Execute `pip install -r requirements.txt` to install the needed dependencies. 
 5. **Environment Variables**: Configure the environment variables as in the `.env.example` file.
+    1. **.env**: Create a `.env` file in the root directory of the project.
+    2. **Environment Variables**: Copy the content of the `.env.example` file to the `.env` file and modify the values as needed.
+    3. **Execute**: Execute `source .env` in Linux or Mac, or `Get-Content .env | ForEach-Object { if ($_ -match '^\s*#|^\s*$') { return }; $line = ($_ -replace '#.*$', '').Trim(); if ($line -match '^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$') { $name = $Matches[1]; $value = $Matches[2].Trim(); if ($value -match '^"(.*)"$') { $value = $Matches[1] } elseif ($value -match "^'(.*)'$") { $value = $Matches[1] }; Set-Item -Path "Env:$name" -Value $value } }` in Windows to load the environment variables.
 6. **Execution**: Execute `uvicorn app.app:app --reload --port 8000` to initialize the API in the 8000 port. 
+7. **Tests Execution**: Execute `pytest` to run the tests. The tests are located in the `tests` folder.
+8. **Linter Execution**: Execute `pylint --rcfile=.pylintrc app/` to run the linter. The linter is configured to use the `.pylintrc` file in the root directory.
 
 ## Docker Image
 
@@ -94,9 +129,7 @@ docker run -d -p 8000:8000 --env-file .env ${USER}/mom_server_api:${TAG}
 
 ## Endpoints
 
-The API provides several endpoint to apply or use different numerical methods for different purposes. The available endpoints are: 
-
-- `GET /`: Verifies if the API is Up.
+The API provides several endpoint to apply or use different numerical methods for different purposes. The available endpoints are at the [Endpoint Documentation File](Endpoints).
 
 ## Contribution
 
