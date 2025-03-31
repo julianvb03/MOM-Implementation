@@ -28,10 +28,10 @@ class UserServiceImpl(UserService):
         Returns:
             User: Created user object.
         """
-        
+
         if self.user_repository.user_exists(user.username):
             raise ValueError("Username already exists")
-        
+
         return self.user_repository.create_user(User(
             username=user.username,
             hashed_password=auth_handler.hash_password(user.password),
