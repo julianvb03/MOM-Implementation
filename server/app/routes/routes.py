@@ -80,6 +80,14 @@ def root(request: Request): # pylint: disable=W0613
                     429: {
                         "model": ResponseError,
                         "description": "Too many requests."
+                    },
+                    401: {
+                        "model": ResponseError,
+                        "description": "Unauthorized."
+                    },
+                    403: {
+                        "model": ResponseError,
+                        "description": "Forbidden."
                     }
                 })
 @limiter.limit("100/minute")
@@ -137,6 +145,14 @@ def login(
                 429: {
                     "model": ResponseError,
                     "description": "Too many requests."
+                },
+                401: {
+                    "model": ResponseError,
+                    "description": "Unauthorized."
+                },
+                403: {
+                    "model": ResponseError,
+                    "description": "Forbidden."
                 }
             })
 @limiter.limit("5/minute")
@@ -163,5 +179,58 @@ def protected(
             status_code=401,
             detail=str(e)
         ) from e
+    except Exception as e: # pylint: disable=W0718
+        raise_exception(e, logger)
+
+
+@router.get("/admin/protected/",
+            tags=["Protected"],
+            status_code=status.HTTP_200_OK,
+            summary="Protected endpoint to test admin authentication.",
+            response_model=str,
+            responses={
+                500: {
+                    "model": ResponseError,
+                    "description": "Internal server error."
+                },
+                429: {
+                    "model": ResponseError,
+                    "description": "Too many requests."
+                },
+                401: {
+                    "model": ResponseError,
+                    "description": "Unauthorized."
+                },
+                403: {
+                    "model": ResponseError,
+                    "description": "Forbidden."
+                }
+            })
+@limiter.limit("5/minute")
+def protected_admin(
+    request: Request,
+    auth: dict = Depends(auth_handler.authenticate_as_admin)
+): # pylint: disable=W0613
+    """
+    Root endpoint.
+
+    Returns:
+        (str): Welcome message.
+    """
+    try:
+        logger.info("Protected endpoint.")
+        return f"This is the protected admin endpoint. Welcome, {auth["username"]}!"
+    except RateLimitExceeded as e:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests."
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        ) from e
+    except HTTPException as e:
+        raise e
     except Exception as e: # pylint: disable=W0718
         raise_exception(e, logger)

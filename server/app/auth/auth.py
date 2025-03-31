@@ -107,6 +107,31 @@ class AuthenticationHandler:
             HTTPException: If token is expired or invalid.
         """
         return self.decode_token(auth_credentials.credentials)
+    
+    def authenticate_as_admin(
+        self,
+        auth_credentials: HTTPAuthorizationCredentials = Security(security)
+    ) -> str:
+        """
+        Wrapper function for admin token authentication.
+        
+        Args:
+            auth_credentials (HTTPAuthorizationCredentials): 
+                HTTP authorization credentials.
+        
+        Returns:
+            (str): User ID if authentication is successful.
+        
+        Raises:
+            HTTPException: If token is expired or invalid.
+        """
+        user = self.decode_token(auth_credentials.credentials)
+        if not user.get("roles") or "admin" not in user["roles"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: access denied"
+            )
+        return user
 
 # Instantiate the authentication handler for further use
 auth_handler = AuthenticationHandler()
