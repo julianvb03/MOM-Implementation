@@ -58,6 +58,20 @@ def test_create_user(user_service, user_repository):
     assert stored_user == created_user
 
 
+def test_create_duplicate_user(user_service):
+    test_user = UserDto(
+        username="duplicate",
+        password="hashed"
+    )
+
+    user_service.create_user(test_user)
+
+    with pytest.raises(ValueError) as exc_info:
+        user_service.create_user(test_user)
+
+    assert "already exists" in str(exc_info.value)
+
+
 def test_login(user_service):
     # Test valid login
     test_user = UserDto(

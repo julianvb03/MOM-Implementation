@@ -47,9 +47,6 @@ class UserRepositoryRedis(UserRepository):
         if self.client is None:
             self.initialize_db()
 
-        if self.user_exists(user.username):
-            raise ValueError("Username already exists")
-
         self.client.hset(
             "users", 
             user.username,
