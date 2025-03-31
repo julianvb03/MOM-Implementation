@@ -6,8 +6,11 @@
 - [Project Structure](#project-structure)
 - [Pre-requisites](#pre-requisites)
 - [Setup Instructions](#setup-instructions)
+- [Docker Image](#docker-image)
+  - [Image Build](#image-build)
+  - [Image Usage](#image-usage)
+- [Endpoints](#endpoints)
 - [Contribution](#contribution)
-- [License](#license)
 - [Contact](#contact)
 
 ## Developers
@@ -129,7 +132,7 @@ docker run -d -p 8000:8000 --env-file .env ${USER}/mom_server_api:${TAG}
 
 ## Endpoints
 
-The API provides several endpoint to apply or use different numerical methods for different purposes. The available endpoints are at the [Endpoint Documentation File](Endpoints).
+The API provides several endpoint to apply or use different numerical methods for different purposes. The available endpoints are at the [Endpoint Documentation File](Endpoints.md).
 
 ## Contribution
 
