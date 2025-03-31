@@ -26,6 +26,7 @@ def initialize_database():
             roles=[UserRole.ADMIN]
         )
         client.hset("users", DEFAULT_USER_NAME, admin.model_dump_json())
+        print(f"Created default user: {DEFAULT_USER_NAME}")
         
     # Set Redis configurations
     client.config_set("maxmemory", "256mb")

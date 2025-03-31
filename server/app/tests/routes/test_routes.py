@@ -1,11 +1,22 @@
 """
 Test the home routes
 """
-from fastapi.testclient import TestClient
-from app.config.env import API_NAME, API_VERSION, DEFAULT_USER_NAME, DEFAULT_USER_PASSWORD
 from app.app import app
+from app.config.env import API_NAME, API_VERSION, DEFAULT_USER_NAME, DEFAULT_USER_PASSWORD
+from app.utils.db import initialize_database
+from fastapi.testclient import TestClient
+import pytest
 
 client = TestClient(app)
+
+@pytest.fixture(autouse=True)
+def initialize_test_db():
+    """
+    Fixture to initialize the test database before each test.
+    This ensures that each test runs with a fresh database state.
+    """
+    # Initialize the database before each test
+    initialize_database()
 
 
 def test_home():
