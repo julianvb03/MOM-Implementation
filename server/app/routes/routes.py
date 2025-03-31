@@ -4,32 +4,16 @@ This module defines the root endpoints of the API.
 from app.adapters.factory import ObjectFactory
 from app.adapters.user_service import UserService
 from app.auth.auth import auth_handler
-from app.config.env import API_NAME
 from app.config.limiter import limiter
+from app.config.logging import logger
 from app.dtos.home_routing_dto import ResponseError
 from app.dtos.user_dto import UserDto, UserLoginResponse
 from app.utils.exceptions import raise_exception
 from fastapi import APIRouter, HTTPException, Request, status, Depends
-import logging
 from slowapi.errors import RateLimitExceeded
 
 
 router = APIRouter()
-
-# Log file name
-log_filename = f"api_{API_NAME}.log"
-
-# Configurate the logging level to catch all messages from DEBUG onwards
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] - %(message)s",
-    handlers=[
-        logging.FileHandler(log_filename),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger(__name__)
 
 
 @router.get("/",
