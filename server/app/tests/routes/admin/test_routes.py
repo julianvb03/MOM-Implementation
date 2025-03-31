@@ -58,12 +58,9 @@ def test_remove_users():
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.post(
-        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/",
-        headers=headers,
-        json={
-            "username": "removal"
-        }
+    response = client.delete(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/removal",
+        headers=headers
     )
     assert response.status_code == 200
     data = response.json()
@@ -75,11 +72,8 @@ def test_remove_users_unauthorized():
     """
     Test the get protected admin endpoint /protected/admin/ without token
     """
-    response = client.post(
-        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/",
-        json={
-            "username": "removal"
-        }
+    response = client.delete(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/removal"
     )
     assert response.status_code == 403
     data = response.json()
@@ -102,12 +96,9 @@ def test_remove_non_existent_user():
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.post(
-        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/",
-        headers=headers,
-        json={
-            "username": "non_existent_user"
-        }
+    response = client.delete(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/non_existent_user",
+        headers=headers
     )
     assert response.status_code == 200
     data = response.json()
@@ -130,7 +121,7 @@ def test_create_users():
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.post(
+    response = client.put(
         f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
         headers=headers,
         json={
@@ -147,7 +138,7 @@ def test_create_users_unauthorized():
     """
     Test the get protected admin endpoint /protected/admin/ without token
     """
-    response = client.post(
+    response = client.put(
         f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
         json={
             "username": "new_user",
@@ -175,7 +166,7 @@ def test_create_users_already_exists():
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.post(
+    response = client.put(
         f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
         headers=headers,
         json={
@@ -186,7 +177,7 @@ def test_create_users_already_exists():
     assert response.status_code == 200
     data = response.json()
     assert "User new_user created successfully." == data
-    response = client.post(
+    response = client.put(
         f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
         headers=headers,
         json={

@@ -32,7 +32,9 @@ class UserLoginResponse(BaseModel):
     """
     Data model for user login operations.
     
-    This model is used for user login responses. It contains the `access_token` attribute, which is a JWT token and the token type.
+    This model is used for user login responses. 
+    It contains the `access_token` attribute, 
+    which is a JWT token and the token type.
 
     Attributes:
         access_token (str): JWT token for user authentication.

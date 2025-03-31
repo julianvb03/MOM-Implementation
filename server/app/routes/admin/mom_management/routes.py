@@ -1,14 +1,11 @@
 """
-This module defines the admin endpoints of the API.
+This module defines the admin mom management endpoints of the API.
 """
-from app.adapters.factory import ObjectFactory
-from app.adapters.user_service import UserService
 from app.auth.auth import auth_handler
 from app.config.limiter import limiter
 from app.config.logging import logger
 from app.dtos.home_routing_dto import ResponseError
-from app.dtos.admin.users_management_dto import RemoveUserDto
-from app.dtos.user_dto import UserDto
+from app.dtos.admin.mom_management_dto import CreateQueueTopic
 from app.utils.exceptions import raise_exception
 from fastapi import APIRouter, HTTPException, Request, status, Depends
 from slowapi.errors import RateLimitExceeded
@@ -17,10 +14,11 @@ from slowapi.errors import RateLimitExceeded
 router = APIRouter()
 
 
-@router.delete("/users/remove/{user}",
-            tags=["Admin", "Admin User Management"],
+@router.put("/queue_topic/create/",
+            tags=["Admin", "Admin Mom Management"],
             status_code=status.HTTP_200_OK,
-            summary="Endpoint to remove the specified user.",
+            summary="Endpoint to create a topic or " \
+                + "queue in the message broker.",
             response_model=str,
             responses={
                 500: {
@@ -41,31 +39,32 @@ router = APIRouter()
                 }
             })
 @limiter.limit("15/minute")
-def remove_users(
+def create_queue_topic(
     request: Request,
-    user: str,
-    user_service: UserService = Depends(
-        lambda: ObjectFactory.get_instance(UserService)
-    ),
+    queue_topic: CreateQueueTopic,
     auth: dict = Depends(auth_handler.authenticate_as_admin)
 ): # pylint: disable=W0613
     """
-    Endpoint to remove the specified user.
+    Endpoint to create a topic or queue in the message broker.
     
     Args:
-        user (RemoveUserDto): User to be removed.
+        queue_topic (CreateQueueTopic): Queue or topic to be created.
         auth (dict): Authenticated user information.
-
     Returns:
         (str): Success message or error message.
     """
     try:
-        logger.info("User removal attempt for %s.", user)
+        logger.info(
+            "%s creation attempt for %s.",
+            "Queue" if queue_topic.type.value == "queue" else "Topic",
+            queue_topic.name
+        )
 
-        if user_service.remove_user(user):
-            return f"User {user} removed successfully."
-        else:
-            return f"User {user} not found."
+        # TODO: Implement the logic to create a
+        # queue or topic in the message broker.
+        # This is a placeholder implementation.
+        return f"{"Queue" if queue_topic.type.value == "queue" else "Topic"} " \
+            + f"{queue_topic.name} created successfully."
     except ValueError as e:
         raise HTTPException(
             status_code=403,
@@ -82,10 +81,11 @@ def remove_users(
         raise_exception(e, logger)
 
 
-@router.put("/users/create/",
-            tags=["Admin", "Admin User Management"],
+@router.delete("/queue_topic/delete/{name}",
+            tags=["Admin", "Admin Mom Management"],
             status_code=status.HTTP_200_OK,
-            summary="Endpoint to create the specified user.",
+            summary="Endpoint to delete a topic " \
+                + "or queue in the message broker.",
             response_model=str,
             responses={
                 500: {
@@ -106,29 +106,30 @@ def remove_users(
                 }
             })
 @limiter.limit("15/minute")
-def create_users(
+def delete_queue_topic(
     request: Request,
-    user: UserDto,
-    user_service: UserService = Depends(
-        lambda: ObjectFactory.get_instance(UserService)
-    ),
+    name: str,
     auth: dict = Depends(auth_handler.authenticate_as_admin)
 ): # pylint: disable=W0613
     """
-    Endpoint to create the specified user.
+    Endpoint to delete a topic or queue in the message broker.
     
     Args:
-        user (RemoveUserDto): User to be created.
+        name (str): Name of the queue or topic to be deleted.
         auth (dict): Authenticated user information.
-
     Returns:
         (str): Success message or error message.
     """
     try:
-        logger.info("User creation attempt for %s.", user.username)
+        logger.info(
+            "Queue/Topic removal attempt for %s.",
+        )
 
-        if user_service.create_user(user):
-            return f"User {user.username} created successfully."
+        # TODO: Implement the logic to create a
+        # queue or topic in the message broker.
+        # This is a placeholder implementation.
+        return "Queue/Topic " \
+            + f"{name} removed successfully."
     except ValueError as e:
         raise HTTPException(
             status_code=403,
