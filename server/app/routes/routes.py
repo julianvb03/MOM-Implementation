@@ -203,7 +203,8 @@ def protected_admin(
     """
     try:
         logger.info("Protected endpoint.")
-        return f"This is the protected admin endpoint. Welcome, {auth["username"]}!"
+        return "This is the protected admin endpoint" \
+            + f". Welcome, {auth["username"]}!"
     except RateLimitExceeded as e:
         raise HTTPException(
             status_code=429,

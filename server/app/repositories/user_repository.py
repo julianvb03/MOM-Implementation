@@ -19,6 +19,21 @@ class UserRepositoryRedis(UserRepository):
         """
         self.client = self.db.get_client()
 
+    def user_exists(self, username: str) -> bool:
+        """
+        Check if a user exists in the database
+        
+        Args:
+            username (str): Username to check.
+            
+        Returns:
+            bool: True if user exists, False otherwise.
+        """
+        if self.client is None:
+            self.initialize_db()
+
+        return self.client.hexists("users", username)
+
     def create_user(self, user: User) -> User:
         """
         Create a new user with hashed password
@@ -32,7 +47,7 @@ class UserRepositoryRedis(UserRepository):
         if self.client is None:
             self.initialize_db()
 
-        if self.client.hexists("users", user.username):
+        if self.user_exists(user.username):
             raise ValueError("Username already exists")
 
         self.client.hset(

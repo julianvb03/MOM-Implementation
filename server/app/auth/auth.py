@@ -107,7 +107,7 @@ class AuthenticationHandler:
             HTTPException: If token is expired or invalid.
         """
         return self.decode_token(auth_credentials.credentials)
-    
+
     def authenticate_as_admin(
         self,
         auth_credentials: HTTPAuthorizationCredentials = Security(security)

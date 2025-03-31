@@ -7,7 +7,6 @@ from app.adapters.user_service import UserService
 from app.dtos.user_dto import UserDto
 from app.app import app
 from app.config.env import API_NAME, API_VERSION, DEFAULT_USER_NAME, DEFAULT_USER_PASSWORD
-from app.models.user import User, UserRole
 from app.utils.db import initialize_database
 from fastapi.testclient import TestClient
 import pytest
@@ -22,8 +21,8 @@ def initialize_test_db():
     """
     db = ObjectFactory.get_instance(Database)
 
-    client = db.get_client()
-    client.flushdb()
+    db_client = db.get_client()
+    db_client.flushdb()
 
     initialize_database()
 
@@ -35,12 +34,12 @@ def initialize_test_db():
 
     # Create the user in the database
     user_service = ObjectFactory.get_instance(UserService)
-    user = user_service.create_user(test_user)
+    user_service.create_user(test_user)
 
     yield
 
     # Cleanup after tests
-    client.flushdb()
+    db_client.flushdb()
     # Initialize the database before each test
 
 
@@ -125,7 +124,6 @@ def test_protected_admin():
         f". Welcome, {DEFAULT_USER_NAME}!" == data
 
 
-        
 def test_protected_admin_unauthorized():
     """
     Test the get protected admin endpoint /protected/admin/ without token
@@ -134,7 +132,7 @@ def test_protected_admin_unauthorized():
     assert response.status_code == 403
     data = response.json()
     assert data["detail"] == "Not authenticated"
-    
+
 def test_protected_admin_forbidden():
     """
     Test the get protected admin endpoint /protected/admin/ with user token
