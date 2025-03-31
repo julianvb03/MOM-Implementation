@@ -7,7 +7,6 @@ from app.auth.auth import auth_handler
 from app.config.limiter import limiter
 from app.config.logging import logger
 from app.dtos.home_routing_dto import ResponseError
-from app.dtos.admin.users_management_dto import RemoveUserDto
 from app.dtos.user_dto import UserDto
 from app.utils.exceptions import raise_exception
 from fastapi import APIRouter, HTTPException, Request, status, Depends

@@ -12,9 +12,10 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.config.env import API_NAME, PRODUCTION_SERVER_URL, DEVELOPMENT_SERVER_URL, LOCALHOST_SERVER_URL, API_VERSION
 from app.config.limiter import limiter
-from app.routes.routes import router
-from app.routes.admin.routes import router as admin_router
 from app.routes.admin.mom_management.routes import router as admin_mom_management_router
+from app.routes.admin.routes import router as admin_router
+from app.routes.mom.routes import router as mom_router
+from app.routes.routes import router
 from app.utils.db import initialize_database
 
 @asynccontextmanager
@@ -112,4 +113,8 @@ app.include_router(admin_router, prefix=f"/api/{API_VERSION}/{API_NAME}/admin")
 app.include_router(
     admin_mom_management_router,
     prefix=f"/api/{API_VERSION}/{API_NAME}/admin"
+)
+app.include_router(
+    mom_router,
+    prefix=f"/api/{API_VERSION}/{API_NAME}/queue_topic"
 )
