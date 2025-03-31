@@ -57,11 +57,15 @@ def test_protected():
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.get(f"/api/{API_VERSION}/{API_NAME}/protected/", headers=headers)
+    response = client.get(
+        f"/api/{API_VERSION}/{API_NAME}/protected/",
+        headers=headers
+    )
     assert response.status_code == 200
     data = response.json()
-    assert f"This is a protected endpoint. Welcome, {DEFAULT_USER_NAME}!" == data
-    
+    assert "This is a protected endpoint" + \
+        f". Welcome, {DEFAULT_USER_NAME}!" == data
+
 def test_protected_unauthorized():
     """
     Test the get protected endpoint /protected/ without token
