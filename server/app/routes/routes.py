@@ -152,7 +152,8 @@ def protected(
     """
     try:
         logger.info("Protected endpoint.")
-        return f"This is a protected endpoint. Welcome, {auth["username"]}!"
+        # pylint: disable=inconsistent-quotes
+        return f"This is a protected endpoint. Welcome, {auth['username']}!"
     except RateLimitExceeded as e:
         raise HTTPException(
             status_code=429,
@@ -203,8 +204,9 @@ def protected_admin(
     """
     try:
         logger.info("Protected endpoint.")
+        # pylint: disable=inconsistent-quotes
         return "This is the protected admin endpoint" \
-            + f". Welcome, {auth["username"]}!"
+            + f". Welcome, {auth['username']}!"
     except RateLimitExceeded as e:
         raise HTTPException(
             status_code=429,

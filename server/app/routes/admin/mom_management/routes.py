@@ -63,7 +63,9 @@ def create_queue_topic(
         # TODO: Implement the logic to create a
         # queue or topic in the message broker.
         # This is a placeholder implementation.
-        return f"{"Queue" if queue_topic.type.value == "queue" else "Topic"} " \
+
+        # pylint: disable=inconsistent-quotes
+        return f"{'Queue' if queue_topic.type.value == 'queue' else 'Topic'} " \
             + f"{queue_topic.name} created successfully."
     except ValueError as e:
         raise HTTPException(
