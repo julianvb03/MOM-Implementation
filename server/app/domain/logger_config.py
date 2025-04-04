@@ -1,5 +1,6 @@
 """
-This module configures the logging for the logic of the queues and topics module.
+This module configures the logging for the logic of the 
+queues and topics module.
 """
 
 import logging

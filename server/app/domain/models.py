@@ -10,7 +10,7 @@ class MOMQueueStatus(Enum):
     QUEUE_CREATED = "Queue and metadata created successfully"
     METADATA_EXISTS = "Metadata for the queue already exists"
     QUEUE_EXISTS = "Queue already exists"
-    METADATA_OR_QUEUE_NOT_EXIST = "Queue or metadata not exist for a queue with that name"
+    METADATA_OR_QUEUE_NOT_EXIST = "Queue or metadata not exist for a queue with that name" # pylint: disable=C0301
     INVALID_ARGUMENTS = "The parameters doesn't work on this context"
     INTERNAL_ERROR = "Unexpected error"
     SUCCES_OPERATION = "The operation was realized without problems"

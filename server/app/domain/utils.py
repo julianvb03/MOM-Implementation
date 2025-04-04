@@ -69,15 +69,15 @@ class TopicKeyBuilder:
     @classmethod
     def subscribers_key(cls, name: str) -> str:
         return f"{cls.topic_key(name)}:{cls.SUBSCRIBERS_SUFFIX}"
-    
+
     @classmethod
     def messages_key(cls, name: str) -> str:
         return f"{cls.topic_key(name)}:{cls.MESSAGES_SUFFIX}"
-    
+
     @classmethod
     def subscriber_offsets_key(cls, topic_name: str) -> str:
         return f"{cls.topic_key(topic_name)}:{cls.SUBSCRIBER_OFFSETS_SUFFIX}"
-    
+
     @classmethod
     def subscriber_offset_field(cls, subscriber: str) -> str:
         return f"subscriber:{subscriber}"

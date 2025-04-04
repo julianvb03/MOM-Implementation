@@ -9,7 +9,7 @@ from datetime import datetime
 from models import MOMQueueStatus, QueueOperationResult
 from logger_config import logger
 from utils import KeyBuilder
-from queues.queue_subscription import SubscriptionService
+from server.app.domain.queues.queues_subscription import SubscriptionService
 from queues.queues_validator import QueueValidator
 
 class MOMQueueManager:
@@ -192,7 +192,7 @@ class MOMQueueManager:
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
                 return result
-            
+
             result = self.validator.validate_user_subscribed(queue_name)
             if result.success is False:
                 return result
