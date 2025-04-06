@@ -100,7 +100,8 @@ class MOMQueueManager:
             if result.success is False:
                 return result
 
-            # Se decidio que el usuario no debe estar subscrito para encolar mensajes
+            # Se decidio que el usuario no debe estar subscrito para
+            # encolar mensajes
             # result = self.validator.validate_user_subscribed(queue_name)
             # if result.success is False:
             #     return result

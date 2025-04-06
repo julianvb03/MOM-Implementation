@@ -7,7 +7,7 @@ from app.adapters.factory import ObjectFactory
 
 import json
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.domain.models import MOMTopicStatus 
 from app.domain.topics.topics_manager import MOMTopicManager
 from app.domain.utils import TopicKeyBuilder
@@ -46,6 +46,14 @@ def topic_manager_alt_fixture(redis_connection):
 def topic_manager_alt2_fixture(redis_connection): 
     """Fixture to provide an alternate user instance of MOMTopicManager""" 
     return MOMTopicManager(redis_connection, "alt_user2")
+
+@pytest.fixture(name="user_managers")
+def user_managers_fixture(redis_connection):
+    """Fixture to provide multiple user instances of MOMTopicManager"""
+    return [
+        MOMTopicManager(redis_connection, f"user_{i}")
+        for i in range(5)  # Create 5 different user managers
+    ]
 
 ## Test for the subscription and unsubscription of a topic
 def test_unsubscribe_creator_form_his_topic(topic_manager):
@@ -472,3 +480,308 @@ def test_consume_to_empty_topic(topic_manager, topic_manager_alt, redis_connecti
     assert result.status == MOMTopicStatus.NO_MESSAGES
     assert result.details == f"No new messages available for this subscription"
 
+## Intensive tests
+
+def test_multiple_publishers_and_consumers(redis_connection, topic_manager, user_managers):
+    """
+    Test scenario with multiple publishers posting to a topic and multiple consumers
+    reading from it, verifying message consumption order and cleanup behavior.
+    """
+    topic_name = "multi_pub_sub_test"
+    
+    # Step 1: Create topic with the main test user
+    result = topic_manager.create_topic(topic_name)
+    assert result.success is True
+    assert result.status == MOMTopicStatus.TOPIC_CREATED
+    
+    # Step 2: Subscribe all users to the topic
+    for manager in user_managers:
+        result = manager.subscriptions.subscribe(topic_name)
+        assert result.success is True
+        assert result.status == MOMTopicStatus.SUBSCRIPTION_CREATED
+    
+    # Step 3: Each user publishes multiple messages
+    messages_by_user = {}
+    total_messages = 0
+    
+    for i, manager in enumerate(user_managers):
+        user_messages = []
+        for j in range(10):  # Each user publishes 10 messages
+            message = f"Message {j} from user_{i}"
+            result = manager.publish(message, topic_name)
+            assert result.success is True
+            assert result.status == MOMTopicStatus.MESSAGE_PUBLISHED
+            user_messages.append(message)
+            total_messages += 1
+        messages_by_user[f"user_{i}"] = user_messages
+    
+    # Add some messages from the topic owner too
+    owner_messages = []
+    for j in range(5):
+        message = f"Message {j} from test_user (owner)"
+        result = topic_manager.publish(message, topic_name)
+        assert result.success is True
+        owner_messages.append(message)
+        total_messages += 1
+    
+    # Verify topic info shows correct message count
+    result = topic_manager.get_topic_info(topic_name)
+    assert result.success is True
+    assert result.details["message_count"] == total_messages
+    
+    # Step 4: Each user consumes messages
+    consumed_messages = {f"user_{i}": [] for i in range(5)}
+    consumed_messages["test_user"] = []
+    
+    # Users read all messages
+    for i, manager in enumerate(user_managers):
+        # Each user will consume until they get NO_MESSAGES
+        while True:
+            result = manager.consume(topic_name)
+            if result.status == MOMTopicStatus.NO_MESSAGES:
+                break
+            if result.status == MOMTopicStatus.MESSAGE_CONSUMED:
+                consumed_messages[f"user_{i}"].append(result.details)
+    
+    # Topic owner also consumes messages
+    while True:
+        result = topic_manager.consume(topic_name)
+        if result.status == MOMTopicStatus.NO_MESSAGES:
+            break
+        if result.status == MOMTopicStatus.MESSAGE_CONSUMED:
+            consumed_messages["test_user"].append(result.details)
+    
+    # Verify each user received all messages except their own
+    for i in range(5):
+        user_id = f"user_{i}"
+        # Each user should not see their own messages
+        for msg in consumed_messages[user_id]:
+            assert f"from {user_id}" not in msg
+        
+        # Users should see messages from all other users
+        expected_message_count = total_messages - len(messages_by_user[user_id])
+        assert len(consumed_messages[user_id]) == expected_message_count
+    
+    # Topic owner should not see their own messages either
+    for msg in consumed_messages["test_user"]:
+        assert "from test_user (owner)" not in msg
+    assert len(consumed_messages["test_user"]) == total_messages - len(owner_messages)
+    
+    # Step 5: Check queue still contains all messages
+    result = topic_manager.get_topic_info(topic_name)
+    assert result.success is True
+    assert result.details["message_count"] == total_messages
+    
+    # Step 6: Run cleanup and verify no messages were deleted
+    # (since all subscribers have consumed their messages but messages remain for record)
+    deleted_count = topic_manager._cleanup_processed_messages(topic_name)
+    
+    # All subscribers have read their messages, so the minimum offset should be the total count
+    # of messages (as each has advanced past all messages)
+    assert deleted_count > 0
+    
+    # Verify queue is now empty or reduced
+    result = topic_manager.get_topic_info(topic_name)
+    assert result.success is True
+    assert result.details["message_count"] < total_messages
+
+def test_time_based_cleanup_with_lagging_consumers(redis_connection, topic_manager, user_managers, monkeypatch):
+    """
+    Test cleanup of messages based on time with some lagging consumers who
+    haven't read all messages, verifying offset adjustments occur properly.
+    """
+    # Set a short persistence time for testing
+    monkeypatch.setenv("PERSISTENCY_ON_TOPIC_TIME", "1")  # 1 minute
+    
+    topic_name = "time_cleanup_test"
+    
+    # Step 1: Create topic with the main test user
+    result = topic_manager.create_topic(topic_name)
+    assert result.success is True
+    
+    # Step 2: Subscribe only first 3 users to the topic
+    active_subscribers = user_managers[:3]
+    for manager in active_subscribers:
+        result = manager.subscriptions.subscribe(topic_name)
+        assert result.success is True
+    
+    # Step 3: Publish 50 messages to the topic
+    for i in range(50):
+        message = f"Test message {i}"
+        result = topic_manager.publish(message, topic_name)
+        assert result.success is True
+    
+    # Step 4: First user consumes all messages
+    first_user = active_subscribers[0]
+    consumed_by_first = []
+    
+    while True:
+        result = first_user.consume(topic_name)
+        if result.status == MOMTopicStatus.NO_MESSAGES:
+            break
+        if result.status == MOMTopicStatus.MESSAGE_CONSUMED:
+            consumed_by_first.append(result.details)
+    
+    # Step 5: Second user consumes only half the messages
+    second_user = active_subscribers[1]
+    consumed_by_second = []
+    
+    for _ in range(25):  # Read only 25 messages
+        result = second_user.consume(topic_name)
+        if result.status == MOMTopicStatus.MESSAGE_CONSUMED:
+            consumed_by_second.append(result.details)
+    
+    # Step 6: Third user doesn't consume any messages
+    
+    # Get offsets before cleanup
+    info_result = topic_manager.get_topic_info(topic_name)
+    offsets_before = info_result.details["subscriber_offsets"]
+    
+    # Step 7: Manipulate message timestamps to simulate older messages (for time-based cleanup)
+    messages_key = TopicKeyBuilder.messages_key(topic_name)
+    for i in range(20):  # Make first 20 messages old
+        message_json = redis_connection.lindex(messages_key, i)
+        message_data = json.loads(message_json)
+        # Set timestamp to 2 minutes ago
+        message_data["timestamp"] = (datetime.now() - timedelta(minutes=2)).isoformat()
+        redis_connection.lset(messages_key, i, json.dumps(message_data))
+    
+    # Step 8: Run cleanup with time-based force
+    deleted_count = topic_manager._cleanup_processed_messages(topic_name, force_cleanup_by_time=True)
+    
+    # Verify some messages were deleted due to time expiration
+    assert deleted_count > 0
+    assert deleted_count <= 20  # Should have deleted at most the first 20 messages
+    
+    # Step 9: Get updated offsets and verify they were adjusted for users who hadn't read those messages
+    info_result = topic_manager.get_topic_info(topic_name)
+    offsets_after = info_result.details["subscriber_offsets"]
+    
+    # First user should already have high offset (unaffected)
+    # Second user might need adjustment if their offset was in the deleted range
+    # Third user definitely needed adjustment as they hadn't read any messages
+    
+    # Check third user's offset was adjusted
+    third_user_key = TopicKeyBuilder.subscriber_offset_field(active_subscribers[2].user)
+    if third_user_key in offsets_before and third_user_key in offsets_after:
+        assert offsets_after[third_user_key] >= deleted_count
+    
+    # Step 10: Try consuming messages with all users to verify consistency
+    # First user should still see no new messages
+    result = first_user.consume(topic_name)
+    assert result.status == MOMTopicStatus.NO_MESSAGES
+    
+    # Second user should be able to continue consuming without issues
+    result = second_user.consume(topic_name)
+    assert result.status == MOMTopicStatus.MESSAGE_CONSUMED
+    
+    # Third user should be able to read messages starting after the deleted ones
+    result = active_subscribers[2].consume(topic_name)
+    assert result.status == MOMTopicStatus.MESSAGE_CONSUMED
+    assert "Test message" in result.details
+    # Message number should be >= deleted_count
+    message_num = int(result.details.split("Test message ")[1])
+    assert message_num >= deleted_count
+
+def test_high_volume_publish_consume_with_periodic_cleanup(redis_connection, topic_manager, user_managers):
+    """
+    Test high volume scenario with periodic cleanups and multiple subscribers,
+    verifying system integrity during high throughput operations.
+    """
+    topic_name = "high_volume_test"
+    num_publishers = 3  # Use first 3 managers as publishers
+    num_subscribers = 5  # All managers are subscribers
+    messages_per_publisher = 100  # Each publisher sends 100 messages
+    
+    # Step 1: Create topic
+    result = topic_manager.create_topic(topic_name)
+    assert result.success is True
+    
+    # Step 2: Subscribe all users
+    for manager in user_managers:
+        result = manager.subscriptions.subscribe(topic_name)
+        assert result.success is True
+    
+    # Step 3: High volume publishing in batches with periodic cleanups
+    publishers = user_managers[:num_publishers]
+    
+    # Dictionary to track messages from each publisher
+    published_messages = {f"user_{i}": [] for i in range(num_publishers)}
+    
+    # Publish in batches with periodic cleanup
+    batch_size = 20
+    for batch in range(messages_per_publisher // batch_size):
+        # Each publisher sends a batch of messages
+        for i, publisher in enumerate(publishers):
+            for j in range(batch_size):
+                message_id = batch * batch_size + j
+                message = f"Publisher {i} - Message {message_id}"
+                result = publisher.publish(message, topic_name)
+                assert result.success is True
+                published_messages[f"user_{i}"].append(message)
+        
+        # Some users consume messages between batches
+        # Let's have users consume in round-robin fashion
+        consuming_user = batch % len(user_managers)
+        consumer = user_managers[consuming_user]
+        
+        # Each consumer reads a certain number of messages in this batch
+        messages_to_consume = min(batch_size // 2, 5)  # Consume a fraction of the new messages
+        for _ in range(messages_to_consume):
+            result = consumer.consume(topic_name)
+            # It's okay if we run out of messages
+            if result.status != MOMTopicStatus.MESSAGE_CONSUMED:
+                break
+                
+        # Run cleanup every other batch
+        if batch % 2 == 1:
+            deleted = topic_manager._cleanup_processed_messages(topic_name)
+            # Record how many messages were cleaned up
+            assert deleted >= 0  # May be 0 if minimum offset is still low
+    
+    # Step 4: Verify topic integrity
+    info_result = topic_manager.get_topic_info(topic_name)
+    assert info_result.success is True
+    
+    total_published = num_publishers * messages_per_publisher
+    
+    # Total messages in topic plus processed count should match total published
+    message_count = info_result.details["message_count"]
+    processed_count = int(info_result.details["metadata"].get(b"processed_count", 0))
+    
+    # Because of our cleanup operations, total message count may be less than published
+    assert message_count + processed_count == total_published
+    
+    # Step 5: All subscribers consume remaining messages
+    # Track consumed messages for verification
+    consumed_messages = {user_managers[i].user: [] for i in range(len(user_managers))}
+    
+    for consumer in user_managers:
+        while True:
+            result = consumer.consume(topic_name)
+            if result.status != MOMTopicStatus.MESSAGE_CONSUMED:
+                break
+            consumed_messages[consumer.user].append(result.details)
+    
+    # Step 6: Final cleanup should remove all messages
+    deleted = topic_manager._cleanup_processed_messages(topic_name)
+    
+    # Verify cleanup removed remaining messages 
+    # (as all users have consumed all messages they should)
+    info_result = topic_manager.get_topic_info(topic_name)
+    final_message_count = info_result.details["message_count"]
+    final_processed_count = int(info_result.details["metadata"].get(b"processed_count", 0))
+    
+    # Either queue is empty or all messages are accounted for
+    assert final_message_count == 0 or final_message_count + final_processed_count == total_published
+    
+    # Step 7: Verify each consumer received expected messages
+    # Each consumer should receive all messages except those from themselves
+    for i, consumer in enumerate(user_managers):
+        user_id = consumer.user
+        
+        # Check that user didn't receive their own messages
+        if i < num_publishers:
+            own_publisher_prefix = f"Publisher {i} -"
+            for message in consumed_messages[user_id]:
+                assert own_publisher_prefix not in message

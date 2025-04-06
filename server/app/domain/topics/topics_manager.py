@@ -453,11 +453,11 @@ class MOMTopicManager:
         try:
             if topic_name:
                 # Limpiar un tema específico
-                deleted_count = self._cleanup_processed_messages(topic_name, force_cleanup_by_time=True)
+                deleted_count = self._cleanup_processed_messages(topic_name, force_cleanup_by_time=True) # pylint: disable=C0301
                 return TopicOperationResult(
                     True,
                     MOMTopicStatus.MESSAGES_CLEANED,
-                    f"Cleaned up {deleted_count} messages from topic '{topic_name}'"
+                    f"Cleaned up {deleted_count} messages from topic '{topic_name}'" # pylint: disable=C0301
                 )
             else:
                 # Limpiar todos los temas
@@ -469,7 +469,7 @@ class MOMTopicManager:
                 for metadata_key in all_metadata_keys:
                     # Extraer el nombre del tema de la clave de metadata
                     topic_name = metadata_key.decode().split(":")[-1]
-                    deleted_count = self._cleanup_processed_messages(topic_name, force_cleanup_by_time=True)
+                    deleted_count = self._cleanup_processed_messages(topic_name, force_cleanup_by_time=True) # pylint: disable=C0301
                     total_deleted += deleted_count
                     
                 return TopicOperationResult(

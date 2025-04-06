@@ -28,12 +28,16 @@ class QueueException(Exception):
         super().__init__(message)
 
 class MOMTopicStatus(Enum):
+    """
+    Enum for MOM topic status messages.
+    """
     TOPIC_CREATED = "Topic and metadata created successfully"
     TOPIC_EXISTS = "Topic already exists"
     TOPIC_NOT_EXIST = "Topic does not exist"
     MESSAGE_PUBLISHED = "Message published to topic successfully"
     MESSAGE_CONSUMED = "Message consumed from topic successfully"
     NO_MESSAGES = "No messages available for this subscription"
+    MESSAGES_CLEANED = "Messages cleaned successfully"
     ALREADY_SUBSCRIBED = "User is already subscribed to this topic"
     NOT_SUBSCRIBED = "User is not subscribed to this topic"
     SUBSCRIPTION_CREATED = "Subscription created successfully"
