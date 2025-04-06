@@ -4,8 +4,8 @@ for validatin queue operations in a Redis-based message queue system,
 isolating the validation logic for better maintainability and readability.
 """
 
-from utils import KeyBuilder
-from models import QueueOperationResult, MOMQueueStatus
+from app.domain.utils import KeyBuilder
+from app.domain.models import QueueOperationResult, MOMQueueStatus
 
 
 class QueueValidator:

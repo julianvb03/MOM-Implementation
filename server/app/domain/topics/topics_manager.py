@@ -4,13 +4,14 @@ Redis-based message system, including creating, deleting,
 publishing, and consuming messages.
 """
 
+import os
 import json
-from datetime import datetime
-from models import TopicOperationResult, MOMTopicStatus
-from logger_config import logger
-from utils import TopicKeyBuilder, limpiar_user
-from topics.topics_subscription import TopicSubscriptionService
-from topics.topics_validator import TopicValidator
+from datetime import datetime, timedelta
+from app.domain.models import TopicOperationResult, MOMTopicStatus
+from app.domain.logger_config import logger
+from app.domain.utils import TopicKeyBuilder, limpiar_user
+from app.domain.topics.topics_subscription import TopicSubscriptionService
+from app.domain.topics.topics_validator import TopicValidator
 
 
 class MOMTopicManager:
@@ -37,6 +38,7 @@ class MOMTopicManager:
         try:
             result = self.validator.validate_topic_exists(topic_name)
             if result.success:
+                result.success = False
                 return result
 
             metadata_key = TopicKeyBuilder.metadata_key(topic_name)
@@ -82,9 +84,10 @@ class MOMTopicManager:
             if not result.success:
                 return result
 
-            result = self.validator.validate_user_subscribed(topic_name)
-            if not result.success:
-                return result
+            # Se decidio que el usuario no debe estar subscrito para encolar mensajes
+            # result = self.validator.validate_user_subscribed(topic_name)
+            # if not result.success:
+            #     return result
 
             full_message = {
                 "timestamp": datetime.now().isoformat(),
@@ -105,7 +108,7 @@ class MOMTopicManager:
             return TopicOperationResult(
                 True,
                 MOMTopicStatus.MESSAGE_PUBLISHED,
-                f"Message published to topic {topic_name} at index {message_index}", # pylint: disable=C0301
+                f"Message published to topic {topic_name}", # pylint: disable=C0301
             )
 
         except Exception as e:  # pylint: disable=W0718
@@ -189,11 +192,9 @@ class MOMTopicManager:
 
             return TopicOperationResult(
                 True,
-                MOMTopicStatus.MESSAGE_PUBLISHED,
-                {
-                    "messages": [message_data["payload"]],
-                    "new_offset": new_offset,
-                },
+                MOMTopicStatus.MESSAGE_CONSUMED,
+                message_data["payload"],
+
             )
 
         except Exception as e:  # pylint: disable=W0718
@@ -204,63 +205,114 @@ class MOMTopicManager:
                 False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)
             )
 
-    def _cleanup_processed_messages(self, topic_name: str) -> int:
+    def _cleanup_processed_messages(self, topic_name: str, force_cleanup_by_time: bool = False) -> int:
         """
-        Delete processed messages from the topic to save memory
-        Only messages that all subscribers have consumed are deleted.
+        Clean up messages that have been processed by all subscribers or 
+        have exceeded the persistence time limit.
+        
         Args:
             topic_name (str): The name of the topic to clean up.
+            force_cleanup_by_time (bool): Whether to force cleanup based on time even if some 
+                                        subscribers haven't read the messages.
+        
         Returns:
-            int: Number of messages removed from the topic.
+            int: Number of messages deleted from the topic.
         """
         try:
-            metadata_key = TopicKeyBuilder.metadata_key(topic_name)
-            topic_owner = self.redis.hget(metadata_key, "owner")
-
-            #subscribers_key = TopicKeyBuilder.subscribers_key(topic_name)
-
-            offset_key = TopicKeyBuilder.subscriber_offsets_key(topic_name)
-            offsets = {
-                k: int(v) for k, v in self.redis.hgetall(offset_key).items()
-            }
-
-            non_owner_offsets = {}
-            for sub_key, offset in offsets.items():
-                subscriber = sub_key.split(":")[-1]
-                if limpiar_user(subscriber) != limpiar_user(topic_owner):
-                    non_owner_offsets[subscriber] = offset
-
-            if not non_owner_offsets:
+            # Verificar que el topico existe
+            result = self.validator.validate_topic_exists(topic_name)
+            if not result.success:
+                logger.warning(f"Cannot cleanup nonexistent topic '{topic_name}'")
                 return 0
-
-            min_offset = (
-                min(non_owner_offsets.values()) if non_owner_offsets else 0
-            )
-
-            processed_count = int(
-                self.redis.hget(metadata_key, "processed_count") or 0
-            )
-
-            messages_to_remove = min_offset - processed_count
-
-            if messages_to_remove <= 0:
-                return 0
-
+                
+            # Obtener claves necesarias
             messages_key = TopicKeyBuilder.messages_key(topic_name)
-            for _ in range(messages_to_remove):
-                self.redis.lpop(messages_key)
-
-            self.redis.hset(metadata_key, "processed_count", min_offset)
-
-            logger.info(
-                f"Removed {messages_to_remove} processed messages from topic '{topic_name}'" # pylint: disable=C0301
-            )
-            return messages_to_remove
-
-        except Exception:  # pylint: disable=W0718
-            logger.exception(
-                f"Error cleaning up messages from topic '{topic_name}'"
-            )
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(topic_name)
+            metadata_key = TopicKeyBuilder.metadata_key(topic_name)
+            
+            # Verificar si hay mensajes para limpiar
+            total_messages = self.redis.llen(messages_key)
+            if total_messages == 0:
+                return 0
+                
+            # Obtener todos los offsets de los suscriptores
+            subscriber_offsets = self.redis.hgetall(offset_key)
+            if not subscriber_offsets:
+                logger.warning(f"No subscribers found for topic '{topic_name}'")
+                return 0
+                
+            # Convertir todos los offsets a enteros
+            offsets = [int(offset) for offset in subscriber_offsets.values()]
+            
+            # El offset mínimo representa la posición del mensaje que algún suscriptor 
+            # todavía no ha leído
+            min_offset = min(offsets) if offsets else 0
+            total_deleted_messages = self.redis.hget(metadata_key, "processed_count")
+            if not total_deleted_messages:
+                total_deleted_messages = 0
+            else:
+                total_deleted_messages = int(total_deleted_messages)
+            
+            real_min_offset = min_offset - total_deleted_messages
+            
+            # Determinar cuántos mensajes pueden ser eliminados basados en que todos los 
+            # hayan leído
+            messages_to_delete_by_subscription = max(0, real_min_offset)
+            
+            # Si se fuerza la limpieza por tiempo, verificar mensajes expirados
+            messages_to_delete_by_time = 0
+            if force_cleanup_by_time:
+                persistency_time = int(os.getenv("PERSISTENCY_ON_TOPIC_TIME", 60))  # tiempo en minutos
+                cutoff_time = datetime.now() - timedelta(minutes=persistency_time)
+                
+                # Verificar cada mensaje hasta el mínimo offset para ver si ha expirado
+                for idx in range(messages_to_delete_by_subscription, total_messages):
+                    message_json = self.redis.lindex(messages_key, idx)
+                    if not message_json:
+                        continue
+                        
+                    message_data = json.loads(message_json)
+                    message_time = datetime.fromisoformat(message_data["timestamp"])
+                    
+                    if message_time < cutoff_time:
+                        messages_to_delete_by_time += 1
+                    else:
+                        # Los mensajes están ordenados por tiempo, así que si este no expiró,
+                        # los siguientes tampoco
+                        break
+                        
+            total_messages_to_delete = messages_to_delete_by_subscription + messages_to_delete_by_time
+            
+            if total_messages_to_delete <= 0:
+                return 0
+                
+            # Si hay mensajes para eliminar por tiempo, ajustar los offsets de todos los suscriptores
+            if messages_to_delete_by_time > 0:
+                for subscriber, offset in subscriber_offsets.items():
+                    current_offset = int(offset)
+                    if current_offset < min_offset + messages_to_delete_by_time:
+                        # Actualizar el offset para que apunte al siguiente mensaje disponible
+                        new_offset = min_offset + messages_to_delete_by_time
+                        self.redis.hset(offset_key, subscriber, new_offset)
+                        
+            # Eliminar los mensajes
+            pipeline = self.redis.pipeline()
+            
+            # Eliminar los mensajes procesados (LTRIM retiene el rango indicado)
+            pipeline.ltrim(messages_key, total_messages_to_delete, -1)
+            
+            # Actualizar contador de mensajes procesados
+            pipeline.hincrby(metadata_key, "processed_count", total_messages_to_delete)
+            
+            pipeline.execute()
+            
+            logger.info(f"Cleaned up {total_messages_to_delete} messages from topic '{topic_name}' " + 
+                    f"({messages_to_delete_by_subscription} by subscription, {messages_to_delete_by_time} by time)")
+            
+            return total_messages_to_delete
+            
+        except Exception as e:  # pylint: disable=W0718
+            logger.exception(f"Error cleaning up messages for topic '{topic_name}': {str(e)}")
             return 0
 
     def get_topic_info(self, topic_name: str) -> TopicOperationResult:
@@ -332,7 +384,7 @@ class MOMTopicManager:
             if not result.success:
                 return TopicOperationResult(
                     False,
-                    MOMTopicStatus.NOT_SUBSCRIBED,
+                    MOMTopicStatus.INVALID_ARGUMENTS,
                     "Only the topic owner can delete it",
                 )
 
@@ -348,7 +400,7 @@ class MOMTopicManager:
 
             return TopicOperationResult(
                 True,
-                MOMTopicStatus.SUBSCRIPTION_DELETED,
+                MOMTopicStatus.TOPIC_DELETED,
                 f"Topic {topic_name} deleted successfully",
             )
 
@@ -386,4 +438,50 @@ class MOMTopicManager:
             logger.exception("Error fetching user topics")
             return TopicOperationResult(
                 False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)
+            )
+
+    def schedule_cleanup(self, topic_name: str = None) -> TopicOperationResult:
+        """
+        Schedule or execute cleanup of processed messages for a specific topic or all topics.
+        
+        Args:
+            topic_name (str, optional): The name of the topic to clean up. If None, clean up all topics.
+        
+        Returns:
+            TopicOperationResult: Result of the cleanup operation.
+        """
+        try:
+            if topic_name:
+                # Limpiar un tema específico
+                deleted_count = self._cleanup_processed_messages(topic_name, force_cleanup_by_time=True)
+                return TopicOperationResult(
+                    True,
+                    MOMTopicStatus.MESSAGES_CLEANED,
+                    f"Cleaned up {deleted_count} messages from topic '{topic_name}'"
+                )
+            else:
+                # Limpiar todos los temas
+                # Buscar todos los temas usando un patrón en las claves
+                metadata_pattern = TopicKeyBuilder.metadata_key_pattern()
+                all_metadata_keys = self.redis.keys(metadata_pattern)
+                
+                total_deleted = 0
+                for metadata_key in all_metadata_keys:
+                    # Extraer el nombre del tema de la clave de metadata
+                    topic_name = metadata_key.decode().split(":")[-1]
+                    deleted_count = self._cleanup_processed_messages(topic_name, force_cleanup_by_time=True)
+                    total_deleted += deleted_count
+                    
+                return TopicOperationResult(
+                    True,
+                    MOMTopicStatus.MESSAGES_CLEANED,
+                    f"Cleaned up {total_deleted} messages from all topics"
+                )
+                
+        except Exception as e:  # pylint: disable=W0718
+            logger.exception(f"Error scheduling cleanup: {str(e)}")
+            return TopicOperationResult(
+                False,
+                MOMTopicStatus.OPERATION_FAILED,
+                f"Error scheduling cleanup: {str(e)}"
             )

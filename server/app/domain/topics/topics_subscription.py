@@ -7,10 +7,10 @@ including subscribing and unsubscribing users to/from topics.
     connection and a user identifier.
 """
 
-from models import TopicOperationResult, MOMTopicStatus
-from logger_config import logger
-from utils import TopicKeyBuilder
-from topics.topics_validator import TopicValidator
+from app.domain.models import TopicOperationResult, MOMTopicStatus
+from app.domain.logger_config import logger
+from app.domain.utils import TopicKeyBuilder
+from app.domain.topics.topics_validator import TopicValidator
 
 class TopicSubscriptionService:
     """

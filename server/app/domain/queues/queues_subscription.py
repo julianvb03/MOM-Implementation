@@ -4,10 +4,10 @@ including subscribing and unsubscribing users to/from queues,
 this way isolating the subscription logic from the queue management logic.
 """
 
-from models import QueueOperationResult, MOMQueueStatus
-from logger_config import logger
-from utils import KeyBuilder
-from queues.queues_validator import QueueValidator
+from app.domain.models import QueueOperationResult, MOMQueueStatus
+from app.domain.logger_config import logger
+from app.domain.utils import KeyBuilder
+from app.domain.queues.queues_validator import QueueValidator
 
 
 class SubscriptionService:

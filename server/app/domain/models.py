@@ -32,12 +32,15 @@ class MOMTopicStatus(Enum):
     TOPIC_EXISTS = "Topic already exists"
     TOPIC_NOT_EXIST = "Topic does not exist"
     MESSAGE_PUBLISHED = "Message published to topic successfully"
+    MESSAGE_CONSUMED = "Message consumed from topic successfully"
     NO_MESSAGES = "No messages available for this subscription"
     ALREADY_SUBSCRIBED = "User is already subscribed to this topic"
     NOT_SUBSCRIBED = "User is not subscribed to this topic"
     SUBSCRIPTION_CREATED = "Subscription created successfully"
     SUBSCRIPTION_DELETED = "Subscription deleted successfully"
     INTERNAL_ERROR = "Internal error occurred"
+    TOPIC_DELETED = "Topic deleted successfully"
+    INVALID_ARGUMENTS = "Invalid arguments provided"
     INCONSISTENT_STATE = "Inconsistent state detected"
 
 @dataclass

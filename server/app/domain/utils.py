@@ -2,8 +2,8 @@
 Utils for MOMQueue
 """
 
-from models import QueueOperationResult, MOMQueueStatus
-from logger_config import logger
+from app.domain.models import QueueOperationResult, MOMQueueStatus
+from app.domain.logger_config import logger
 
 class KeyBuilder:
     """

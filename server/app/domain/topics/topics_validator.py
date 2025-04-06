@@ -4,8 +4,8 @@ including checking if a topic exists, if a user is subscribed to a topic,
 and if a user is the owner of a topic.
 """
 
-from models import TopicOperationResult, MOMTopicStatus
-from utils import TopicKeyBuilder
+from app.domain.models import TopicOperationResult, MOMTopicStatus
+from app.domain.utils import TopicKeyBuilder
 
 class TopicValidator:
     """
@@ -65,7 +65,7 @@ class TopicValidator:
         """
         metadata_key = TopicKeyBuilder.metadata_key(topic_name)
         owner = self.redis.hget(metadata_key, "owner")
-        if owner and owner.decode() != self.user:
+        if owner and owner != self.user:
             return TopicOperationResult(
                 False,
                 MOMTopicStatus.NOT_SUBSCRIBED,

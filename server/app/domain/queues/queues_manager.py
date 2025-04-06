@@ -5,12 +5,12 @@ including creating, deleting, enqueuing, and dequeuing messages.
 
 import json
 import uuid
-from datetime import datetime
-from models import MOMQueueStatus, QueueOperationResult
-from logger_config import logger
-from utils import KeyBuilder
-from server.app.domain.queues.queues_subscription import SubscriptionService
-from queues.queues_validator import QueueValidator
+from datetime import datetime, timezone
+from app.domain.models import MOMQueueStatus, QueueOperationResult
+from app.domain.logger_config import logger
+from app.domain.utils import KeyBuilder
+from app.domain.queues.queues_subscription import SubscriptionService
+from app.domain.queues.queues_validator import QueueValidator
 
 class MOMQueueManager:
     """
@@ -100,14 +100,15 @@ class MOMQueueManager:
             if result.success is False:
                 return result
 
-            result = self.validator.validate_user_subscribed(queue_name)
-            if result.success is False:
-                return result
+            # Se decidio que el usuario no debe estar subscrito para encolar mensajes
+            # result = self.validator.validate_user_subscribed(queue_name)
+            # if result.success is False:
+            #     return result
 
             message_id = str(uuid.uuid4())
             full_message = {
                 "id": message_id,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "payload": json.dumps(message),
             }
             self.redis.rpush(queue_key, json.dumps(full_message))
