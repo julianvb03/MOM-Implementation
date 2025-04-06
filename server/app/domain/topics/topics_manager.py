@@ -270,7 +270,7 @@ class MOMTopicManager:
             messages_to_delete_by_time = 0
             if force_cleanup_by_time:
                 persistency_time = int(
-                    int(os.getenv("PERSISTENCY_ON_TOPIC_TIME"), 60)
+                    int(os.getenv("PERSISTENCY_ON_TOPIC_TIME", "60"))
                 )  # tiempo en minutos
                 cutoff_time = datetime.now() - timedelta(
                     minutes=persistency_time
