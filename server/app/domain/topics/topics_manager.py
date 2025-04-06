@@ -347,7 +347,7 @@ class MOMTopicManager:
             topic_info = {
                 "metadata": metadata,
                 "subscribers": subscribers,
-                "message_count": message_count,
+                "messages_in_queue": message_count,
                 "subscriber_offsets": offsets,
             }
 

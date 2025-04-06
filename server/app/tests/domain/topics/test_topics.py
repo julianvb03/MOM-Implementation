@@ -527,7 +527,7 @@ def test_multiple_publishers_and_consumers(redis_connection, topic_manager, user
     # Verify topic info shows correct message count
     result = topic_manager.get_topic_info(topic_name)
     assert result.success is True
-    assert result.details["message_count"] == total_messages
+    assert result.details["messages_in_queue"] == total_messages
     
     # Step 4: Each user consumes messages
     consumed_messages = {f"user_{i}": [] for i in range(5)}
@@ -570,7 +570,7 @@ def test_multiple_publishers_and_consumers(redis_connection, topic_manager, user
     # Step 5: Check queue still contains all messages
     result = topic_manager.get_topic_info(topic_name)
     assert result.success is True
-    assert result.details["message_count"] == total_messages
+    assert result.details["messages_in_queue"] == total_messages
     
     # Step 6: Run cleanup and verify no messages were deleted
     # (since all subscribers have consumed their messages but messages remain for record)
@@ -578,12 +578,18 @@ def test_multiple_publishers_and_consumers(redis_connection, topic_manager, user
     
     # All subscribers have read their messages, so the minimum offset should be the total count
     # of messages (as each has advanced past all messages)
-    assert deleted_count > 0
+    assert deleted_count == total_messages
     
-    # Verify queue is now empty or reduced
+    # Verify queue is now empty
     result = topic_manager.get_topic_info(topic_name)
     assert result.success is True
-    assert result.details["message_count"] < total_messages
+
+    # Verify that the numer of processed messages is now equal to the number of
+    # message count of metadata
+    metadata = result.details["metadata"]
+    processed_count = int(metadata.get("processed_count", 0))
+    assert 0 == result.details["messages_in_queue"]
+    assert processed_count == deleted_count
 
 def test_time_based_cleanup_with_lagging_consumers(redis_connection, topic_manager, user_managers, monkeypatch):
     """
@@ -746,7 +752,7 @@ def test_high_volume_publish_consume_with_periodic_cleanup(redis_connection, top
     total_published = num_publishers * messages_per_publisher
     
     # Total messages in topic plus processed count should match total published
-    message_count = info_result.details["message_count"]
+    message_count = info_result.details["messages_in_queue"]
     processed_count = int(info_result.details["metadata"].get(b"processed_count", 0))
     
     # Because of our cleanup operations, total message count may be less than published
@@ -769,7 +775,7 @@ def test_high_volume_publish_consume_with_periodic_cleanup(redis_connection, top
     # Verify cleanup removed remaining messages 
     # (as all users have consumed all messages they should)
     info_result = topic_manager.get_topic_info(topic_name)
-    final_message_count = info_result.details["message_count"]
+    final_message_count = info_result.details["messages_in_queue"]
     final_processed_count = int(info_result.details["metadata"].get(b"processed_count", 0))
     
     # Either queue is empty or all messages are accounted for
