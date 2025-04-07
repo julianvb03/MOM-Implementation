@@ -27,7 +27,7 @@ class KeyBuilder:
 
 def handle_redis_errors(log_message: str):
     """
-    This wrapper do a operation over the database taht can fail
+    This wrapper executes an operation over the database that might fail
     Args:
       log_message: A message for write on the log file.
 
