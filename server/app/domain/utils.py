@@ -7,7 +7,7 @@ from app.domain.logger_config import logger
 
 class KeyBuilder:
     """
-    Class for build repetitive keys
+    Class for building repetitive keys
     """
     QUEUE_PREFIX = "mom:queues"
     METADATA_SUFFIX = "metadata"
