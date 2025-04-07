@@ -1,0 +1,33 @@
+syntaxys = "proto3";
+package mom.replication.topic;
+
+service TopicReplicationService {
+  rpc ReplicateCreateTopic(CreateTopicRequest) returns (TopicReplicationResponse);
+  rpc ReplicateDeleteTopic(DeleteTopicRequest) returns (TopicReplicationResponse);
+  rpc ReplicatePublishMessage(PublishMessageRequest) returns (TopicReplicationResponse);
+  rpc ReplicateConsumeMessage(ConsumeMessageRequest) returns (TopicReplicationResponse);
+  rpc ReplicateCleanupTopic(CleanupTopicRequest) returns (TopicReplicationResponse);
+}
+
+service TopicSubscriptionReplicationService {
+  rpc ReplicateCreateSubscription(CreateSubscriptionRequest) returns (TopicReplicationResponse);
+  rpc ReplicateDeleteSubscription(DeleteSubscriptionRequest) returns (TopicReplicationResponse);
+}
+
+enum TopicReplicationResponseStatus {
+  SUCCESS = 0;
+  FAILURE = 1;
+  TOPIC_NOT_FOUND = 2;
+}
+
+message TopicReplicationResponse {
+  TopicReplicationResponseStatus status = 1;
+  string message = 2;
+}
+
+message CreateTopicRequest {
+  string topic_name = 1;
+  int32 partition_count = 2;
+  int32 replication_factor = 3;
+}
+

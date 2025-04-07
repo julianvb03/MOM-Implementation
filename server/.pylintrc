@@ -413,3 +413,6 @@ valid-classmethod-first-arg=cls,
 
 # List of valid names for the first argument in a metaclass class method.
 valid-metaclass-classmethod-first-arg=mcs
+
+[MASTER]
+ignore=tests
