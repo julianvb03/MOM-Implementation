@@ -123,7 +123,7 @@ class MOMQueueManager:
                 "Message enqueued successfully",
             )
         except Exception as e: # pylint: disable=W0718
-            logger.exception("Error denqueueing message to '%s'",queue_name)
+            logger.exception("Error dequeueing message to '%s'",queue_name)
             return QueueOperationResult(
                 False, MOMQueueStatus.INTERNAL_ERROR, str(e)
             )
