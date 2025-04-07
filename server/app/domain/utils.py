@@ -80,7 +80,7 @@ class TopicKeyBuilder:
 
     @classmethod
     def subscriber_offset_field(cls, subscriber: str) -> str:
-        return f"subscriber:{subscriber}"
+        return f"subscriber_offset:{subscriber}"
 
 def limpiar_user(texto):
     texto = texto.replace("'", "")

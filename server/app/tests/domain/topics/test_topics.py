@@ -7,6 +7,7 @@ from app.adapters.factory import ObjectFactory
 
 import json
 import pytest
+import time
 from datetime import datetime, timedelta
 from app.domain.models import MOMTopicStatus 
 from app.domain.topics.topics_manager import MOMTopicManager
@@ -258,6 +259,10 @@ def test_delete_the_topic_of_other(topic_manager, topic_manager_alt, redis_conne
     assert status1 == 1
     assert status2 == 1
 
+    result = topic_manager_alt.subscriptions.subscribe(topic_name)
+    assert result is not None
+    assert result.success == True
+    assert result.status == MOMTopicStatus.SUBSCRIPTION_CREATED
     # Try to delete the topic as another user
     result = topic_manager_alt.delete_topic(topic_name)
     
@@ -362,10 +367,11 @@ def test_consume_my_own_messages(topic_manager, redis_connection):
 
     # Consume the message from the topic
     result = topic_manager.consume(topic_name)
+
     assert result is not None
     assert result.success == True
     assert result.status == MOMTopicStatus.NO_MESSAGES
-    assert result.details == f"No new messages available for this subscription"
+    assert result.details == f"No new messages"
 
     # Eciste el mensaje pero no se puede consumir, ya que es el creador
     # Check if the message is still stored in Redis
@@ -407,7 +413,7 @@ def test_consume_message_of_other_when_was_published_in_the_past(topic_manager, 
     assert result is not None
     assert result.success == True
     assert result.status == MOMTopicStatus.NO_MESSAGES
-    assert result.details == f"No new messages available for this subscription"
+    assert result.details == f"No new messages"
 
     # Check if the message is still stored in Redis
     result1 = redis_connection.lrange(TopicKeyBuilder.messages_key(topic_name), 0, -1)
@@ -478,7 +484,7 @@ def test_consume_to_empty_topic(topic_manager, topic_manager_alt, redis_connecti
     assert result is not None
     assert result.success == True
     assert result.status == MOMTopicStatus.NO_MESSAGES
-    assert result.details == f"No new messages available for this subscription"
+    assert result.details == f"No new messages"
 
 ## Intensive tests
 
@@ -645,11 +651,11 @@ def test_time_based_cleanup_with_lagging_consumers(redis_connection, topic_manag
     
     # Step 7: Manipulate message timestamps to simulate older messages (for time-based cleanup)
     messages_key = TopicKeyBuilder.messages_key(topic_name)
-    for i in range(20):  # Make first 20 messages old
+    for i in range(20):
         message_json = redis_connection.lindex(messages_key, i)
         message_data = json.loads(message_json)
-        # Set timestamp to 2 minutes ago
-        message_data["timestamp"] = (datetime.now() - timedelta(minutes=2)).isoformat()
+        # Establecer timestamp a 2 minutos atrás (como número)
+        message_data["timestamp"] = (datetime.now() - timedelta(minutes=2)).timestamp()
         redis_connection.lset(messages_key, i, json.dumps(message_data))
     
     # Step 8: Run cleanup with time-based force
