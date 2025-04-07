@@ -14,7 +14,7 @@ from app.domain.queues.queues_validator import QueueValidator
 
 class MOMQueueManager:
     """
-    This classs handles the management of message queues in a Redis database,
+    This class handles the management of message queues in a Redis database,
     including creating, deleting, enqueuing, and dequeuing messages,
     it uses the SubscriptionService and QueueValidator classes for managing 
     subscriptionsand validating queue operations.
