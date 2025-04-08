@@ -5,6 +5,7 @@ from app.adapters.db import Database
 from app.adapters.user_repository import UserRepository
 from app.adapters.user_service import UserService
 from app.config.db import RedisDatabase
+from app.config.env import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 from app.repositories.user_repository import UserRepositoryRedis
 from app.services.user_service import UserServiceImpl
 
@@ -25,7 +26,11 @@ class ObjectFactory:
 
         # Create a new instance if it doesn't exist
         if interface == Database:
-            instance = RedisDatabase()
+            instance = RedisDatabase(
+                host=REDIS_HOST,
+                port=REDIS_PORT,
+                password=REDIS_PASSWORD
+            )
             ObjectFactory._instances[interface] = instance
             return instance
         if interface == UserRepository:

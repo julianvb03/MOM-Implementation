@@ -16,6 +16,11 @@ REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = os.getenv('REDIS_PORT')
 
+# Users Database configuration
+REDIS_USERS_PASSWORD = os.getenv('REDIS_USERS_PASSWORD')
+REDIS_USERS_HOST = os.getenv('REDIS_USERS_HOST')
+REDIS_USERS_PORT = os.getenv('REDIS_USERS_PORT')
+
 # Default user configuration
 DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
 DEFAULT_USER_NAME = os.getenv('DEFAULT_USER_NAME')
