@@ -13,6 +13,7 @@ from app.domain.logger_config import logger
 from app.domain.utils import TopicKeyBuilder
 from app.domain.topics.topics_subscription import TopicSubscriptionService
 from app.domain.topics.topics_validator import TopicValidator
+from app.domain.topics.topics_replication import TopicReplicationClient
 
 
 class MOMTopicManager:
@@ -27,12 +28,16 @@ class MOMTopicManager:
         self.user = user
         self.subscriptions = TopicSubscriptionService(self.redis, self.user)
         self.validator = TopicValidator(self.redis, user)
+        self.replication_client = TopicReplicationClient()
 
-    def create_topic(self, topic_name: str) -> TopicOperationResult:
+    def create_topic(self, topic_name: str, principal = True, created_at = None) -> TopicOperationResult:
         """
         Create a new topic with the specified name.
         Args:
             topic_name (str): The name of the topic to create.
+            principal (bool): Whether the topic is created by the principal node.
+            created_at (float): The timestamp of the topic creation (if is not principal).
+
         Returns:
             TopicOperationResult: Result of the topic creation operation.
         """
@@ -52,13 +57,17 @@ class MOMTopicManager:
                         # Inicia transacción
                         pipe.multi()
 
+                        if principal and created_at is None:
+                            created_at = datetime.now().timestamp()
+
                         # Crear metadata
                         metadata = {
                             "name": topic_name,
                             "owner": self.user,
-                            "created_at": datetime.now().timestamp(),
+                            "created_at": created_at,
                             "message_count": 0,
                             "processed_count": 0,
+                            "original_node": int(principal)
                         }
                         pipe.hset(metadata_key, mapping=metadata)
 
@@ -71,18 +80,42 @@ class MOMTopicManager:
                         offset_field = TopicKeyBuilder.subscriber_offset_field(self.user) # pylint: disable=C0301
                         pipe.hsetnx(offset_key, offset_field, 0)
 
+                        # Replicar creación del tópico
+                        replication_op = False
+                        if principal:
+                            replication_op = self.replication_client.replicate_create_topic(
+                                topic_name, self.user, created_at
+                            )
+
+                        if principal and replication_op == False:
+                            # Descartar la transacción si la replicación falla
+                            pipe.discard()
+                            return TopicOperationResult(
+                                success=False,
+                                status=MOMTopicStatus.REPLICATION_FAILED,
+                                details="Topic not replicated",
+                                replication_result=False
+                            )
+
                         pipe.execute()  # Ejecuta todo atómicamente
+
                         return TopicOperationResult(
-                            True,
-                            MOMTopicStatus.TOPIC_CREATED,
-                            f"Topic {topic_name} created successfully",
+                            success=True,
+                            status=MOMTopicStatus.TOPIC_CREATED,
+                            details=f"Topic {topic_name} created successfully",
+                            replication_result=replication_op
                         )
                     except redis.WatchError:
                         # Reintentar si otra transacción modificó metadata_key
                         continue
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error creating topic '%s'", topic_name)
-            return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                details=str(e),
+                replication_result=False
+            )
 
     def publish(self, message: str, topic_name: str) -> TopicOperationResult:
         """
@@ -412,13 +445,14 @@ class MOMTopicManager:
                 False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)
             )
 
-    def delete_topic(self, topic_name: str) -> TopicOperationResult:
+    def delete_topic(self, topic_name: str, principal = True) -> TopicOperationResult:
         """
         Delete the specified topic and all its messages.
         Only the owner can delete a topic.
 
         Args:
             topic_name (str): The name of the topic to delete.
+            principal (bool): Whether the topic is deleted by the principal node.
         Returns:
             TopicOperationResult: Result of the topic deletion operation.
         """
@@ -445,16 +479,38 @@ class MOMTopicManager:
                     TopicKeyBuilder.subscriber_offsets_key(topic_name),
                 ]
                 pipe.delete(*keys)
+
+                if principal == True:
+                    replication_operation = self.replication_client.replicate_delete_topic(
+                        topic_name=topic_name, 
+                        owner=self.user
+                    )
+
+                    if replication_operation == False:
+                        pipe.discard()
+                        return TopicOperationResult(
+                            success=False,
+                            status=MOMTopicStatus.REPLICATION_FAILED,
+                            details="Topic not replicated",
+                            replication_result=False
+                        )
+
                 pipe.execute()  # Borrado atómico
 
                 return TopicOperationResult(
-                    True,
-                    MOMTopicStatus.TOPIC_DELETED,
-                    f"Topic {topic_name} deleted successfully",
+                    success=True,
+                    status=MOMTopicStatus.TOPIC_DELETED,
+                    details="Topic deleted successfully",
+                    replication_result=True
                 )
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error deleting topic '%s'", topic_name)
-            return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details=str(e),
+                replication_result=False
+            )
 
     def get_user_topics(self) -> TopicOperationResult:
         """

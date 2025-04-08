@@ -60,8 +60,9 @@ def user_managers_fixture(redis_connection):
 def test_unsubscribe_creator_form_his_topic(topic_manager):
     """Test unsubscribing the creator from his topic"""
     topic_name = "test_topic"
-    topic = topic_manager.create_topic(topic_name)
+    topic = topic_manager.create_topic(topic_name=topic_name)
     
+    print("data oif response {topic.success} {topic.status} {topic.details}")
     assert topic is not None
     assert topic.success == True
     assert topic.status == MOMTopicStatus.TOPIC_CREATED

@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package app.grpc;
+
+// General response message for replication
+enum StatusCode {
+  REPLICATION_SUCCESS = 0;
+  REPLICATION_FAILED = 1;
+  REPLICATION_NOT_REQUIRED = 2;
+  INVALID_REPLICATION_STATUS = 3;
+  REPLICATE_NODE_DISCONNECTED = 4;
+}
+
+message ReplicationResponse {
+  bool success = 1;
+  StatusCode status_code = 2;
+  string message = 3;
+}
+
+// Replication service for topics
+service TopicReplication {
+  // Create topic replication Done
+  rpc TopicReplicateCreate(CreateTopicRequest) returns (ReplicationResponse) {}
+  // Delete topic replication
+  rpc TopicReplicateDelete(DeleteTopicRequest) returns (ReplicationResponse) {}
+  // Publish message replication
+  rpc TopicReplicatePublishMessage(TopicPublishMessageRequest) returns (ReplicationResponse) {}
+  // Subscribe user replication
+  rpc TopicReplicateSubscribe(TopicSubscribeRequest) returns (ReplicationResponse) {}
+  // Unsubscribe user replication
+  rpc TopicReplicateUnsubscribe(TopicUnsubscribeRequest) returns (ReplicationResponse) {}
+}
+
+message CreateTopicRequest {
+  string topic_name = 1;
+  string owner = 2;
+  double created_at = 3;  // timestamp
+  string original_node = 4;
+}
+
+message DeleteTopicRequest {
+  string topic_name = 1;
+  string requester = 2;
+}
+
+message TopicPublishMessageRequest {
+  string topic_name = 1;
+  string publisher = 2;
+  string message = 3;
+  double timestamp = 4;
+}
+
+message TopicSubscribeRequest {
+  string topic_name = 1;
+  string subscriber = 2;
+}
+
+message TopicUnsubscribeRequest {
+  string topic_name = 1;
+  string subscriber = 2;
+}
+
+// Replication service for queues
+service QueueReplication {
+  // Create queue replication
+  rpc QueueReplicateCreate(CreateQueueRequest) returns (ReplicationResponse) {}
+  // Delete queue replication
+  // rpc QueueReplicateDelete(DeleteQueueRequest) returns (ReplicationResponse) {}
+  // Publish message replication
+  // rpc QueueReplicateEnqueue(QueueEnqueueRequest) returns (ReplicationResponse) {}
+  // Subscribe user replication
+  // rpc QueueReplicateSubscribe(QueueSubscribeRequest) returns (ReplicationResponse) {}
+  // Unsubscribe user replication
+  // rpc QueueReplicateUnsubscribe(QueueUnsubscribeRequest) returns (ReplicationResponse) {}
+  // Dequeue message replication
+  // rpc QueueReplicateDequeue(QueueDequeueRequest) returns (ReplicationResponse) {}
+}
+
+message CreateQueueRequest {
+  string queue_name = 1;
+  string owner = 2;
+  double created_at = 3;  // timestamp
+  bool original_node = 4;
+}
