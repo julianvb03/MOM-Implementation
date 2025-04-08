@@ -7,6 +7,8 @@ from app.grpc.replication_service_pb2 import (
     StatusCode,
     CreateTopicRequest,
     DeleteTopicRequest,
+    TopicPublishMessageRequest,
+    TopicConsumeMessageRequest,
     ReplicationResponse,
     CreateQueueRequest,
 )
@@ -98,3 +100,75 @@ class TopicReplicationClient:
             logger.error(f"REPLICATION ERROR: gRPC error replicating topic deletion: {str(e)}")
             return False
         
+    def replicate_publish_message(self, topic_name: str, publisher: str, message: str, timestamp: float) -> bool:
+        """
+        Replicate message publishing to the replica node
+        
+        Args:
+            topic_name (str): The name of the topic.
+            publisher (str): The user publishing the message.
+            message (str): The message content.
+            timestamp (float): The timestamp of the message.
+
+        Returns:
+            bool: True if the message was replicated successfully, False otherwise.
+        """
+        try:
+            client = self.get_client()
+            if not client:
+                logger.error("Failed to create gRPC client '%s'", self.replica_address)
+                return False
+
+            request = TopicPublishMessageRequest(
+                topic_name=topic_name,
+                publisher=publisher,
+                message=message,
+                timestamp=timestamp
+            )
+
+            response = client.TopicReplicatePublishMessage(request)
+
+            if response.success:
+                return True
+            else:
+                return False
+
+        except grpc.RpcError as e:
+            logger.error(f"REPLICATION ERROR: gRPC error replicating message: {str(e)}")
+        return False
+
+    def replicate_consume_message(self, topic_name: str, subscriber: str, offset: int) -> bool:
+        """
+        Replicate message consumption to the replica node
+        
+        Args:
+            topic_name (str): The name of the topic.
+            subscriber (str): The user consuming the message.
+            offset (int): The new offset after consuming the message.
+            timestamp (float): The timestamp of the consumption.
+
+        Returns:
+            bool: True if the offset was replicated successfully, False otherwise.
+        """
+        try:
+            client = self.get_client()
+            if not client:
+                logger.error("Failed to create gRPC client '%s'", self.replica_address)
+                return False
+
+            request = TopicConsumeMessageRequest(
+                topic_name=topic_name,
+                subscriber=subscriber,
+                offset=offset
+            )
+
+            response = client.TopicReplicateConsumeMessage(request)
+
+            if response.success:
+                return True
+            else:
+                return False
+
+        except grpc.RpcError as e:
+            logger.error(f"REPLICATION ERROR: gRPC error replicating consumption: {str(e)}")
+            return False

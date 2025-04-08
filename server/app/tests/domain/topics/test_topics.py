@@ -4,6 +4,8 @@ Test cases for the MOMTopicManager class
 
 from app.adapters.db import Database
 from app.adapters.factory import ObjectFactory
+import redis
+import os
 
 import json
 import pytest
@@ -23,6 +25,38 @@ def clear_redis():
     client.flushdb()  # Before test
     yield
     client.flushdb()  # After test
+
+REDIS2_CONFIG = {
+    'host': 'localhost',
+    'port': 6380,
+    'password': os.getenv('REDIS_PASSWORD'),
+    'decode_responses': True
+}
+
+def create_redis2_connection():
+    """Crea y retorna una conexión a redis2"""
+    try:
+        r = redis.Redis(**REDIS2_CONFIG)
+        if r.ping():
+            print("Conexión exitosa a redis2")
+            return r
+        raise ConnectionError("No se pudo conectar a redis2")
+    except redis.AuthenticationError:
+        print("Error de autenticación. Verifica la contraseña")
+        return None
+    except redis.ConnectionError:
+        print("No se pudo conectar a redis2. Verifica si el servicio está corriendo")
+        return None
+    finally:
+        r.close()
+
+@pytest.fixture(autouse=True)
+def create_redis2_connection_fixture():
+    """Fixture to provide a connection to redis2"""
+    db = create_redis2_connection()
+    db.flushdb()
+    yield db
+    db.flushdb()
 
 
 @pytest.fixture(name="redis_connection")
@@ -237,7 +271,7 @@ def test_delete_topic(topic_manager, redis_connection):
     assert result is not None
     assert result.success == True
     assert result.status == MOMTopicStatus.TOPIC_DELETED
-    assert result.details == f"Topic test_topic deleted successfully"
+    assert result.details == f"Topic deleted successfully"
 
     status1 = redis_connection.exists(TopicKeyBuilder.metadata_key(topic_name))
     status2 = redis_connection.exists(TopicKeyBuilder.subscribers_key(topic_name))

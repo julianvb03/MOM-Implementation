@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from app.grpc import replication_service_pb2 as replication__service__pb2
+import app.grpc.replication_service_pb2 as replication__service__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
@@ -50,6 +50,11 @@ class TopicReplicationStub(object):
                 request_serializer=replication__service__pb2.TopicPublishMessageRequest.SerializeToString,
                 response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
                 _registered_method=True)
+        self.TopicReplicateConsumeMessage = channel.unary_unary(
+                '/app.grpc.TopicReplication/TopicReplicateConsumeMessage',
+                request_serializer=replication__service__pb2.TopicConsumeMessageRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
         self.TopicReplicateSubscribe = channel.unary_unary(
                 '/app.grpc.TopicReplication/TopicReplicateSubscribe',
                 request_serializer=replication__service__pb2.TopicSubscribeRequest.SerializeToString,
@@ -67,21 +72,28 @@ class TopicReplicationServicer(object):
     """
 
     def TopicReplicateCreate(self, request, context):
-        """Create topic replication
+        """Create topic replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def TopicReplicateDelete(self, request, context):
-        """Delete topic replication
+        """Delete topic replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def TopicReplicatePublishMessage(self, request, context):
-        """Publish message replication
+        """Publish message replication Done
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TopicReplicateConsumeMessage(self, request, context):
+        """Consume message replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -117,6 +129,11 @@ def add_TopicReplicationServicer_to_server(servicer, server):
             'TopicReplicatePublishMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.TopicReplicatePublishMessage,
                     request_deserializer=replication__service__pb2.TopicPublishMessageRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'TopicReplicateConsumeMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.TopicReplicateConsumeMessage,
+                    request_deserializer=replication__service__pb2.TopicConsumeMessageRequest.FromString,
                     response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
             ),
             'TopicReplicateSubscribe': grpc.unary_unary_rpc_method_handler(
@@ -211,6 +228,33 @@ class TopicReplication(object):
             target,
             '/app.grpc.TopicReplication/TopicReplicatePublishMessage',
             replication__service__pb2.TopicPublishMessageRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TopicReplicateConsumeMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.TopicReplication/TopicReplicateConsumeMessage',
+            replication__service__pb2.TopicConsumeMessageRequest.SerializeToString,
             replication__service__pb2.ReplicationResponse.FromString,
             options,
             channel_credentials,

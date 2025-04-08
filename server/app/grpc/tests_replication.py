@@ -31,6 +31,14 @@ if __name__ == "__main__":
     if n_test == 1:
         topic_manager = MOMTopicManager(client, "test_user")
         result = topic_manager.delete_topic("test_topic")
+
+    if n_test == 2:
+        topic_manager = MOMTopicManager(client, "test_user")
+        result = topic_manager.publish("test_message3", "test_topic")
+
+    if n_test == 3:
+        topic_manager = MOMTopicManager(client, "test_user")
+        result = topic_manager.consume("test_topic")
         
     print("Result Status: ", result.status, "Success:", result.status, "Details:", result.details, "Replication:", result.replication_result)
     #flush_redis()

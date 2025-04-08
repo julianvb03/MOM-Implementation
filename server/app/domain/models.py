@@ -1,5 +1,5 @@
 """
-    This module defines the QueueOperationResult class and the 
+    This module defines the QueueOperationResult class and the
     QueueException class.
 """
 import os

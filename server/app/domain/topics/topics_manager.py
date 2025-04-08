@@ -117,7 +117,7 @@ class MOMTopicManager:
                 replication_result=False
             )
 
-    def publish(self, message: str, topic_name: str) -> TopicOperationResult:
+    def publish(self, message: str, topic_name: str, principal = True, timestamp = None) -> TopicOperationResult:
         """
         Publish a string message to the specified topic.
         Args:
@@ -134,11 +134,32 @@ class MOMTopicManager:
                     return result
 
                 # Preparar mensaje
+                if principal and timestamp is None:
+                    timestamp = datetime.now().timestamp()
+                else:
+                    timestamp = float(timestamp)    
+
                 full_message = {
-                    "timestamp": datetime.now().timestamp(),
+                    "timestamp": timestamp,
                     "publisher": self.user,
                     "payload": message,
                 }
+
+                if principal:
+                    replication_op = self.replication_client.replicate_publish_message(
+                        topic_name, self.user, message, timestamp
+                    )
+                else:
+                    replication_op = False
+
+                if principal and replication_op == False:
+                    pipe.discard()
+                    return TopicOperationResult(
+                        success=False,
+                        status=MOMTopicStatus.REPLICATION_FAILED,
+                        details="Message not replicated",
+                        replication_result=False
+                    )
 
                 # Ejecutar en transacción
                 pipe.multi()
@@ -149,15 +170,16 @@ class MOMTopicManager:
                 pipe.execute()  # Atomicidad garantizada
 
                 return TopicOperationResult(
-                    True,
-                    MOMTopicStatus.MESSAGE_PUBLISHED,
-                    f"Message published to topic {topic_name}",
+                    success=True,
+                    status=MOMTopicStatus.MESSAGE_PUBLISHED,
+                    details=f"Message published to topic {topic_name}",
+                    replication_result=replication_op
                 )
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error publishing to topic '%s'", topic_name)
             return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
 
-    def consume(self, topic_name: str) -> TopicOperationResult:
+    def consume(self, topic_name: str, self_consume: bool = False) -> TopicOperationResult:
         """
         Consume string messages from a topic based on the subscriber's current
         offset. Default is now to consume only one message at a time for
@@ -166,68 +188,71 @@ class MOMTopicManager:
         Args:
             topic_name (str): The name of the topic to consume from.
             count (int): Maximum number of messages to consume (default: 1).
+            self_consume (bool): Whether the consume is from the same user that published the message.
 
         Returns:
             TopicOperationResult: Result containing consumed string messages.
         """
         try:
             lua_script = """
-            local offset_key = KEYS[1]
-            local messages_key = KEYS[2]
-            local metadata_key = KEYS[3]
-            local user = ARGV[1]
+        local offset_key = KEYS[1]
+        local messages_key = KEYS[2]
+        local metadata_key = KEYS[3]
+        local user = ARGV[1]
 
-            -- Obtener campo del offset
-            local offset_field = "subscriber_offset:" .. user
-            local current_offset = tonumber(redis.call('HGET', offset_key, offset_field))
-            
-            -- Validar offset inicializado
-            if not current_offset then
-                return {"ERROR", "OFFSET_NOT_INITIALIZED"}
+        -- Obtener campo del offset
+        local offset_field = "subscriber_offset:" .. user
+        local current_offset = tonumber(redis.call('HGET', offset_key, offset_field))
+        
+        -- Validar offset inicializado
+        if not current_offset then
+            return {"ERROR", "OFFSET_NOT_INITIALIZED"}
+        end
+
+        -- Obtener mensajes procesados
+        local total_deleted = tonumber(redis.call('HGET', metadata_key, 'processed_count') or 0)
+
+        -- Calcular offset real
+        local real_offset = current_offset - total_deleted
+        if real_offset < 0 then
+            return {"ERROR", "INVALID_OFFSET"}
+        end
+
+        -- Verificar si hay mensajes
+        local total_messages = redis.call('LLEN', messages_key)
+        if real_offset >= total_messages then
+            return {"NO_MESSAGES", tostring(current_offset)}
+        end
+
+        -- Leer mensaje
+        local raw_message = redis.call('LINDEX', messages_key, real_offset)
+        if not raw_message then
+            return {"NO_MESSAGES", tostring(current_offset)}
+        end
+
+        -- Decodificar mensaje
+        local success, message_data = pcall(cjson.decode, raw_message)
+        if not success or type(message_data) ~= "table" then
+            return {"ERROR", "MESSAGE_CORRUPTED"}
+        end
+
+        -- Saltar mensajes propios
+        if message_data.publisher == user then
+            local new_offset = current_offset + 1
+            redis.call('HSET', offset_key, offset_field, new_offset)
+            local new_real_offset = new_offset - total_deleted
+            if new_real_offset >= redis.call('LLEN', messages_key) then
+                return {"NO_MESSAGES", tostring(new_offset)}
+            else
+                return {"SELF_MESSAGE", tostring(new_offset)}
             end
+        end
 
-            -- Obtener mensajes procesados
-            local total_deleted = tonumber(redis.call('HGET', metadata_key, 'processed_count') or 0)
-
-            -- Calcular offset real
-            local real_offset = current_offset - total_deleted
-            if real_offset < 0 then
-                return {"ERROR", "INVALID_OFFSET"}
-            end
-
-            -- Verificar si hay mensajes
-            local total_messages = redis.call('LLEN', messages_key)
-            if real_offset >= total_messages then
-                return {"NO_MESSAGES"}
-            end
-
-            -- Leer mensaje
-            local raw_message = redis.call('LINDEX', messages_key, real_offset)
-            if not raw_message then
-                return {"NO_MESSAGES"}
-            end
-
-            -- Decodificar mensaje
-            local success, message_data = pcall(cjson.decode, raw_message)
-            if not success or type(message_data) ~= "table" then
-                return {"ERROR", "MESSAGE_CORRUPTED"}
-            end
-
-            -- Saltar mensajes propios
-            if message_data.publisher == user then
-                redis.call('HSET', offset_key, offset_field, current_offset + 1)
-                local new_real_offset = (current_offset + 1) - total_deleted
-                if new_real_offset >= redis.call('LLEN', messages_key) then
-                    return {"NO_MESSAGES"}
-                else
-                    return {"SELF_MESSAGE"}
-                end
-            end
-
-            -- Actualizar offset y retornar mensaje
-            redis.call('HSET', offset_key, offset_field, current_offset + 1)
-            return {"MESSAGE", raw_message}
-            """
+        -- Actualizar offset y retornar mensaje
+        local new_offset = current_offset + 1
+        redis.call('HSET', offset_key, offset_field, new_offset)
+        return {"MESSAGE", raw_message, tostring(new_offset)}
+        """
 
             keys = [
                 TopicKeyBuilder.subscriber_offsets_key(topic_name),
@@ -242,29 +267,49 @@ class MOMTopicManager:
                 status = result[0].decode() if isinstance(result[0], bytes) else result[0] # pylint: disable=C0301
 
                 if status == "NO_MESSAGES":
+
+                    # Aunque no hay mensajes, se replica el offset
+                    # Si el consumo es propio
+                    # Esto por que puede que aquel que lo consuma sea
+                    # el que envio el mensaje
+                    if self_consume == True:
+                        new_offset = int(result[1])
+                        self.replication_client.replicate_consume_message(
+                            topic_name, self.user, new_offset
+                        )
+
                     return TopicOperationResult(
-                        True,
-                        MOMTopicStatus.NO_MESSAGES,
-                        "No new messages"
+                        success=True,
+                        status=MOMTopicStatus.NO_MESSAGES,
+                        details="No new messages",
+                        replication_result=False if self_consume == False else True
                     )
 
                 elif status == "SELF_MESSAGE":
-                    return self.consume(topic_name)  # Reintentar recursivamente
+                    return self.consume(topic_name, True)  # Reintentar recursivamente
 
                 elif status == "MESSAGE":
                     message_data = json.loads(result[1])
+                    new_offset = int(result[2])
+
+                    replication_op = self.replication_client.replicate_consume_message(
+                        topic_name, self.user, new_offset
+                    )
+
                     return TopicOperationResult(
-                        True,
-                        MOMTopicStatus.MESSAGE_CONSUMED,
-                        message_data.get("payload", "")
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_CONSUMED,
+                        details=message_data.get("payload", ""),
+                        replication_result=replication_op
                     )
 
                 elif status == "ERROR":
                     error_details = result[1].decode() if len(result) > 1 else "Unknown error" # pylint: disable=C0301
                     return TopicOperationResult(
-                        False,
-                        MOMTopicStatus.INTERNAL_ERROR,
-                        error_details
+                        success=False,
+                        status=MOMTopicStatus.INTERNAL_ERROR,
+                        details=error_details,
+                        replication_result=False
                     )
 
             return TopicOperationResult(
