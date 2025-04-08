@@ -4,32 +4,16 @@ This module defines the root endpoints of the API.
 from app.adapters.factory import ObjectFactory
 from app.adapters.user_service import UserService
 from app.auth.auth import auth_handler
-from app.config.env import API_NAME
 from app.config.limiter import limiter
-from app.dtos.home_routing_dto import ResponseError
+from app.config.logging import logger
+from app.dtos.general_dtos import ResponseError
 from app.dtos.user_dto import UserDto, UserLoginResponse
 from app.utils.exceptions import raise_exception
 from fastapi import APIRouter, HTTPException, Request, status, Depends
-import logging
 from slowapi.errors import RateLimitExceeded
 
 
 router = APIRouter()
-
-# Log file name
-log_filename = f"api_{API_NAME}.log"
-
-# Configurate the logging level to catch all messages from DEBUG onwards
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] - %(message)s",
-    handlers=[
-        logging.FileHandler(log_filename),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger(__name__)
 
 
 @router.get("/",
@@ -80,6 +64,14 @@ def root(request: Request): # pylint: disable=W0613
                     429: {
                         "model": ResponseError,
                         "description": "Too many requests."
+                    },
+                    401: {
+                        "model": ResponseError,
+                        "description": "Unauthorized."
+                    },
+                    403: {
+                        "model": ResponseError,
+                        "description": "Forbidden."
                     }
                 })
 @limiter.limit("100/minute")
@@ -137,6 +129,14 @@ def login(
                 429: {
                     "model": ResponseError,
                     "description": "Too many requests."
+                },
+                401: {
+                    "model": ResponseError,
+                    "description": "Unauthorized."
+                },
+                403: {
+                    "model": ResponseError,
+                    "description": "Forbidden."
                 }
             })
 @limiter.limit("5/minute")
@@ -152,7 +152,8 @@ def protected(
     """
     try:
         logger.info("Protected endpoint.")
-        return f"This is a protected endpoint. Welcome, {auth["username"]}!"
+        # pylint: disable=inconsistent-quotes
+        return f"This is a protected endpoint. Welcome, {auth['username']}!"
     except RateLimitExceeded as e:
         raise HTTPException(
             status_code=429,
@@ -163,5 +164,60 @@ def protected(
             status_code=401,
             detail=str(e)
         ) from e
+    except Exception as e: # pylint: disable=W0718
+        raise_exception(e, logger)
+
+
+@router.get("/admin/protected/",
+            tags=["Protected"],
+            status_code=status.HTTP_200_OK,
+            summary="Protected endpoint to test admin authentication.",
+            response_model=str,
+            responses={
+                500: {
+                    "model": ResponseError,
+                    "description": "Internal server error."
+                },
+                429: {
+                    "model": ResponseError,
+                    "description": "Too many requests."
+                },
+                401: {
+                    "model": ResponseError,
+                    "description": "Unauthorized."
+                },
+                403: {
+                    "model": ResponseError,
+                    "description": "Forbidden."
+                }
+            })
+@limiter.limit("5/minute")
+def protected_admin(
+    request: Request,
+    auth: dict = Depends(auth_handler.authenticate_as_admin)
+): # pylint: disable=W0613
+    """
+    Root endpoint.
+
+    Returns:
+        (str): Welcome message.
+    """
+    try:
+        logger.info("Protected endpoint.")
+        # pylint: disable=inconsistent-quotes
+        return "This is the protected admin endpoint" \
+            + f". Welcome, {auth['username']}!"
+    except RateLimitExceeded as e:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests."
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        ) from e
+    except HTTPException as e:
+        raise e
     except Exception as e: # pylint: disable=W0718
         raise_exception(e, logger)

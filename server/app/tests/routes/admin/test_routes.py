@@ -28,7 +28,7 @@ def initialize_test_db():
 
     # Create a test user
     test_user = UserDto(
-        username="notadminuser",
+        username="removal",
         password="123",
     )
 
@@ -43,63 +43,7 @@ def initialize_test_db():
     # Initialize the database before each test
 
 
-def test_home():
-    """
-    Test the home get endpoint or the root get endpoint /
-    """
-    response = client.get(f"/api/{API_VERSION}/{API_NAME}/")
-    assert response.status_code == 200
-    data = response.json()
-    assert data == "Welcome to MOM TET API!"
-
-
-def test_login():
-    """
-    Test the post login endpoint /login/
-    """
-    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
-        "username": DEFAULT_USER_NAME,
-        "password": DEFAULT_USER_PASSWORD
-    })
-    assert response.status_code == 200
-    data = response.json()
-    assert data["token_type"] == "Bearer"
-
-
-def test_protected():
-    """
-    Test the get protected endpoint /protected/
-    """
-    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
-        "username": DEFAULT_USER_NAME,
-        "password": DEFAULT_USER_PASSWORD
-    })
-    assert response.status_code == 200
-    data = response.json()
-    token = data["access_token"]
-    token_type = data["token_type"]
-    headers = {
-        "Authorization": f"{token_type} {token}"
-    }
-    response = client.get(
-        f"/api/{API_VERSION}/{API_NAME}/protected/",
-        headers=headers
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert "This is a protected endpoint" + \
-        f". Welcome, {DEFAULT_USER_NAME}!" == data
-
-def test_protected_unauthorized():
-    """
-    Test the get protected endpoint /protected/ without token
-    """
-    response = client.get(f"/api/{API_VERSION}/{API_NAME}/protected/")
-    assert response.status_code == 403
-    data = response.json()
-    assert data["detail"] == "Not authenticated"
-
-def test_protected_admin():
+def test_remove_users():
     """
     Test the get protected admin endpoint /protected/admin/
     """
@@ -114,48 +58,133 @@ def test_protected_admin():
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.get(
-        f"/api/{API_VERSION}/{API_NAME}/admin/protected/",
+    response = client.delete(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/removal",
         headers=headers
     )
     assert response.status_code == 200
     data = response.json()
-    assert "This is the protected admin endpoint" + \
-        f". Welcome, {DEFAULT_USER_NAME}!" == data
+    assert "User removal " + \
+        "removed successfully." == data
 
 
-def test_protected_admin_unauthorized():
+def test_remove_users_unauthorized():
     """
     Test the get protected admin endpoint /protected/admin/ without token
     """
-    response = client.get(f"/api/{API_VERSION}/{API_NAME}/admin/protected/")
+    response = client.delete(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/removal"
+    )
     assert response.status_code == 403
     data = response.json()
     assert data["detail"] == "Not authenticated"
 
-def test_protected_admin_forbidden():
+
+def test_remove_non_existent_user():
     """
-    Test the get protected admin endpoint /protected/admin/ with user token
-    of a non admin user
+    Test the get protected admin endpoint 
+    /protected/admin/ with non existent user
     """
     response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
-        "username": "notadminuser",
-        "password": "123"
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
     })
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
-    assert "token_type" in data
-    assert data["token_type"] == "Bearer"
     token = data["access_token"]
     token_type = data["token_type"]
     headers = {
         "Authorization": f"{token_type} {token}"
     }
-    response = client.get(
-        f"/api/{API_VERSION}/{API_NAME}/admin/protected/",
+    response = client.delete(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/remove/non_existent_user",
         headers=headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User non_existent_user " + \
+        "not found." == data
+
+
+def test_create_users():
+    """
+    Test the get protected admin endpoint /protected/admin/
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
+        headers=headers,
+        json={
+            "username": "new_user",
+            "password": "123"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User new_user created successfully." == data
+
+
+def test_create_users_unauthorized():
+    """
+    Test the get protected admin endpoint /protected/admin/ without token
+    """
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
+        json={
+            "username": "new_user",
+            "password": "123"
+        }
     )
     assert response.status_code == 403
     data = response.json()
-    assert data["detail"] == "Forbidden: access denied"
+    assert data["detail"] == "Not authenticated"
+
+
+def test_create_users_already_exists():
+    """
+    Test the get protected admin endpoint 
+    /protected/admin/ with already existing user
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
+        headers=headers,
+        json={
+            "username": "new_user",
+            "password": "123"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User new_user created successfully." == data
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/users/create/",
+        headers=headers,
+        json={
+            "username": "new_user",
+            "password": "123"
+        }
+    )
+    assert response.status_code == 403
+    data = response.json()
+    assert "Username already exists" == data["detail"]

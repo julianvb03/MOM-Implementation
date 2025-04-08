@@ -1,7 +1,12 @@
+"""
+This module contains utility functions for database operations.
+It includes a function to initialize the database with default values.
+"""
 from app.auth.auth import auth_handler
 from app.adapters.db import Database
 from app.adapters.factory import ObjectFactory
 from app.config.env import DEFAULT_USER_PASSWORD, DEFAULT_USER_NAME
+from app.exceptions.database_exceptions import DatabaseConnectionError
 from app.models.user import User, UserRole
 
 
@@ -15,8 +20,8 @@ def initialize_database():
     db = ObjectFactory.get_instance(Database)
     client = db.get_client()
     if not client:
-        raise Exception("Database client not initialized")
-    
+        raise DatabaseConnectionError("Database client not initialized")
+
     admin_user = client.hget("users", DEFAULT_USER_NAME)
     if not admin_user:
         hashed_password = auth_handler.hash_password(DEFAULT_USER_PASSWORD)
@@ -27,7 +32,7 @@ def initialize_database():
         )
         client.hset("users", DEFAULT_USER_NAME, admin.model_dump_json())
         print(f"Created default user: {DEFAULT_USER_NAME}")
-        
+
     # Set Redis configurations
     client.config_set("maxmemory", "256mb")
     client.config_set("maxmemory-policy", "allkeys-lru")

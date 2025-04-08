@@ -44,21 +44,6 @@ def test_create_user(user_repository):
     assert stored_user == test_user
 
 
-def test_create_duplicate_user(user_repository):
-    test_user = User(
-        username="duplicate",
-        hashed_password="hashed",
-        roles=[UserRole.USER]
-    )
-
-    user_repository.create_user(test_user)
-
-    with pytest.raises(ValueError) as exc_info:
-        user_repository.create_user(test_user)
-
-    assert "already exists" in str(exc_info.value)
-
-
 def test_get_nonexistent_user(user_repository):
     result = user_repository.get_user("nonexistent")
     assert result is None

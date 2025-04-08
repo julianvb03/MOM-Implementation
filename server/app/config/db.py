@@ -36,7 +36,7 @@ class RedisDatabase(Database):
                 health_check_interval=30,
                 socket_keepalive=True
             )
-            self._connected = True\
+            self._connected = True
 
         if not self._client:
             self._client = Redis(connection_pool=self._pool)
