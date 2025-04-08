@@ -17,7 +17,7 @@ def initialize_database():
     If not, it creates the admin user with a hashed password.
     It also sets some initial configurations for Redis.
     """
-    db = ObjectFactory.get_instance(Database)
+    db = ObjectFactory.get_instance(Database, ObjectFactory.USERS_DATABASE)
     client = db.get_client()
     if not client:
         raise DatabaseConnectionError("Database client not initialized")

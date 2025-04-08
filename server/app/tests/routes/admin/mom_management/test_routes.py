@@ -17,7 +17,7 @@ def initialize_test_db():
     Fixture to initialize the test database before each test.
     This ensures that each test runs with a fresh database state.
     """
-    db = ObjectFactory.get_instance(Database)
+    db = ObjectFactory.get_instance(Database, ObjectFactory.USERS_DATABASE)
 
     db_client = db.get_client()
     db_client.flushdb()

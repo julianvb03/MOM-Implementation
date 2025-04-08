@@ -9,7 +9,7 @@ import pytest
 # Erase Redis data before each test
 @pytest.fixture(autouse=True)
 def clear_redis():
-    db = ObjectFactory.get_instance(Database)
+    db = ObjectFactory.get_instance(Database, ObjectFactory.USERS_DATABASE)
 
     client = db.get_client()
     client.flushdb()
@@ -23,7 +23,7 @@ def test_initialize_database():
     # Initialize database
     initialize_database()
 
-    db = ObjectFactory.get_instance(Database)
+    db = ObjectFactory.get_instance(Database, ObjectFactory.USERS_DATABASE)
     redis = db.get_client()
 
     # Verify admin exists
