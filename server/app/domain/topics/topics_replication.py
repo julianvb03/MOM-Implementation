@@ -17,11 +17,14 @@ from app.grpc.replication_service_pb2_grpc import TopicReplicationStub
 class TopicReplicationClient:
     """Client for topic replication via gRPC"""
     
-    def __init__(self):
+    def __init__(self, to_original_node: bool = False):
         # Determinar el nodo de réplica basado en la configuración
         self.current_node = WHOAMI
         self.replica_node_id = NODES_CONFIG[self.current_node]['whoreplica']
-        self.replica_address = f"{NODES_CONFIG[self.replica_node_id]['ip']}:{NODES_CONFIG[self.replica_node_id]['grpc_port']}"
+        if not to_original_node:
+            self.replica_address = f"{NODES_CONFIG[self.replica_node_id]['ip']}:{NODES_CONFIG[self.replica_node_id]['grpc_port']}"
+        else:
+            self.replica_address = f"{NODES_CONFIG[self.current_node]['ip']}:{NODES_CONFIG[self.current_node]['grpc_port']}"
         
     def get_client(self):
         """Create and return a gRPC stub for the replication service"""

@@ -90,6 +90,7 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 message="Topic does not exist"
             )
 
+        # Solo el nodo principal puede eliminar un tópico
         if int(db.hget(metadata_key, "original_node")) != 0:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details("Permission denied")
@@ -134,8 +135,8 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
         result = topic_manager.publish(
             message=request.message,
             topic_name=request.topic_name,
-            principal=False,
-            timestamp=request.timestamp
+            timestamp=request.timestamp,
+            im_replicating=True
         )
         
         if not result.success:

@@ -17,11 +17,9 @@ if __name__ == "__main__":
     try:
         n_test = int(sys.argv[1])
     except ValueError:
-        print("Error: El número de test debe ser un entero (0 o 1)")
         sys.exit(1)
     
     if n_test is None:
-        print("Error: El número de test debe ser un entero (0 o 1)")
         sys.exit(1)
     
     if n_test == 0:
@@ -34,7 +32,7 @@ if __name__ == "__main__":
 
     if n_test == 2:
         topic_manager = MOMTopicManager(client, "test_user")
-        result = topic_manager.publish("test_message3", "test_topic")
+        result = topic_manager.publish("test_message_timido", "test_topic")
 
     if n_test == 3:
         topic_manager = MOMTopicManager(client, "test_user")

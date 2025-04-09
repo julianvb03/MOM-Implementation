@@ -29,6 +29,7 @@ class MOMTopicManager:
         self.subscriptions = TopicSubscriptionService(self.redis, self.user)
         self.validator = TopicValidator(self.redis, user)
         self.replication_client = TopicReplicationClient()
+        self.replication_principal = TopicReplicationClient(to_original_node=True)
 
     def create_topic(self, topic_name: str, principal = True, created_at = None) -> TopicOperationResult:
         """
@@ -117,12 +118,15 @@ class MOMTopicManager:
                 replication_result=False
             )
 
-    def publish(self, message: str, topic_name: str, principal = True, timestamp = None) -> TopicOperationResult:
+    def publish(self, message: str, topic_name: str, timestamp = None, im_replicating = False) -> TopicOperationResult:
         """
         Publish a string message to the specified topic.
         Args:
             message (str): The string message to publish.
             topic_name (str): The name of the topic to publish to.
+            timestamp (float): The timestamp of the message.
+            im_replicating (bool): Whether the publish is being replicated.
+
         Returns:
             TopicOperationResult: Result of the publish operation.
         """
@@ -131,28 +135,65 @@ class MOMTopicManager:
                 # Validar existencia del tópico
                 result = self.validator.validate_topic_exists(topic_name)
                 if not result.success:
+                    result.replication_result = False
                     return result
+                
+                # validar si soy el mom principal para este topico
+                result = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node")
+                principal = bool(int(result))
+                logger.critical("Soy el mom principal para este topico: %s", principal)
 
                 # Preparar mensaje
                 if principal and timestamp is None:
                     timestamp = datetime.now().timestamp()
                 else:
                     timestamp = float(timestamp)    
-
+                logger.critical("timestamp: %s", timestamp)
                 full_message = {
                     "timestamp": timestamp,
                     "publisher": self.user,
                     "payload": message,
                 }
+                
+                # Replicar publicación del mensaje
+                # Para saber si el nodo es principal o replicante se puede mirar en metadata
+                # 
+                # 2 opciones:
+                # 1. Si el nodo es principal, se replica la publicación usando replication_client
+                # esta apunta al nodo replicante
+                # 2. Si es el nodo replicante, se replica la publicación usando
+                # replication_principal que apunta al nodo principal
+                # Primero se debe preguntar al zookeeper si el nodo principal o replicante esta up
+                # si está down se manda un log al zookeeper para posterior recuperación
 
-                if principal:
+                # IMPORTANTE:
+                # se debe usar una variable que diga si esta replicando o no para evitar una
+                # recursividad infinita
+
+                # TODO: preguntar al zookeeper si el nodo principal o replicante esta up
+                #zookeper_validation = ...
+                replication_op = False
+                logger.critical("principal: %s", principal)
+                logger.critical("im_replicating: %s", im_replicating)
+                logger.critical("principal and im_replicating: %s", principal and im_replicating == False)
+                logger.critical("not principal and im_replicating: %s", not principal and im_replicating == False)
+
+                if principal and im_replicating == False:
+                    logger.critical("replicando con replication_client")
                     replication_op = self.replication_client.replicate_publish_message(
                         topic_name, self.user, message, timestamp
                     )
-                else:
-                    replication_op = False
+                elif not principal and im_replicating == False:
+                    logger.critical("replicando con replication_principal")
+                    replication_op = self.replication_principal.replicate_publish_message(
+                        topic_name, self.user, message, timestamp
+                    )
+                
+                # Si estoy replicando no necesito replicar de nuevo
+                if im_replicating == True:
+                    replication_op = True
 
-                if principal and replication_op == False:
+                if (principal and replication_op == False) or (not principal and im_replicating == True and replication_op == False):
                     pipe.discard()
                     return TopicOperationResult(
                         success=False,
@@ -161,13 +202,12 @@ class MOMTopicManager:
                         replication_result=False
                     )
 
-                # Ejecutar en transacción
                 pipe.multi()
                 messages_key = TopicKeyBuilder.messages_key(topic_name)
                 pipe.rpush(messages_key, json.dumps(full_message))
                 metadata_key = TopicKeyBuilder.metadata_key(topic_name)
                 pipe.hincrby(metadata_key, "message_count", 1)
-                pipe.execute()  # Atomicidad garantizada
+                pipe.execute()
 
                 return TopicOperationResult(
                     success=True,
@@ -177,7 +217,12 @@ class MOMTopicManager:
                 )
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error publishing to topic '%s'", topic_name)
-            return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
+            return TopicOperationResult(
+                success=False, 
+                status=MOMTopicStatus.INTERNAL_ERROR, 
+                details=str(e),
+                replication_result=False
+            )
 
     def consume(self, topic_name: str, self_consume: bool = False) -> TopicOperationResult:
         """
