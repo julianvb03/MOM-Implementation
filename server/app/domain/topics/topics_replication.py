@@ -10,7 +10,7 @@ from app.grpc.replication_service_pb2 import (
     TopicSubscribeRequest,
     TopicUnsubscribeRequest,
 )
-from app.grpc.replication_service_pb2_grpc import TopicReplicationStub, QueueReplicationStub
+from app.grpc.replication_service_pb2_grpc import TopicReplicationStub
 
 class TopicReplicationClient:
     """Client for topic replication via gRPC"""
@@ -24,7 +24,6 @@ class TopicReplicationClient:
         """
         self.stub = stub
         self.target_node_desc = target_node_desc
-        logger.info(f"TopicReplicationClient initialized for {target_node_desc}")
             
     def replicate_create_topic(self, topic_name: str, owner: str, created_at) -> bool:
         """

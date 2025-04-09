@@ -3,6 +3,7 @@ import grpc
 import os
 import redis
 from app.domain.topics.topics_manager import MOMTopicManager
+from app.domain.queues.queues_manager import MOMQueueManager
 from app.domain.utils import TopicKeyBuilder
 from app.grpc.replication_service_pb2 import ReplicationResponse, StatusCode
 from app.grpc import replication_service_pb2_grpc
@@ -340,12 +341,95 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
             )
 
 class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServicer):
-    pass
+    def QueueReplicateCreate(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed"
+                )
+
+            queue_manager = MOMQueueManager(db, request.owner)
+            result = queue_manager.create_queue(
+                queue_name=request.queue_name,
+                principal=False,
+                created_at=request.created_at
+            )
+            
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Queue replicated successfully"
+            )
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+        
+    def QueueReplicateDelete(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed"
+                )
+
+            queue_manager = MOMQueueManager(db, request.requester)
+            result = queue_manager.delete_queue(
+                queue_name=request.queue_name,
+            )            
+            
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Queue replicated successfully"
+            )
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     replication_service_pb2_grpc.add_TopicReplicationServicer_to_server(
         TopicReplicationServicer(), server
+    )
+    replication_service_pb2_grpc.add_QueueReplicationServicer_to_server(
+        QueueReplicationServicer(), server
     )
     server.add_insecure_port("[::]:50051")
     server.start()

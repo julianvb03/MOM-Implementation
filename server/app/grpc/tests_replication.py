@@ -1,5 +1,6 @@
 from app.domain.models import MOMTopicStatus 
 from app.domain.topics.topics_manager import MOMTopicManager
+from app.domain.queues.queues_manager import MOMQueueManager
 from app.domain.utils import TopicKeyBuilder
 import sys
 
@@ -32,7 +33,7 @@ if __name__ == "__main__":
 
     if n_test == 2:
         topic_manager = MOMTopicManager(client, "test_user")
-        result = topic_manager.publish("test_message_timidont", "test_topic")
+        result = topic_manager.publish("ADSFASDFAFASFAS", "test_topic")
 
     if n_test == 3:
         topic_manager = MOMTopicManager(client, "test_user")
@@ -45,6 +46,14 @@ if __name__ == "__main__":
     if n_test == 5:
         topic_manager = MOMTopicManager(client, "test_user2")
         result = topic_manager.subscriptions.unsubscribe("test_topic")
+
+    if n_test == 6:
+        queue_manager = MOMQueueManager(client, "test_user")
+        result = queue_manager.create_queue(queue_name="test_queue")
+
+    if n_test == 7:
+        queue_manager = MOMQueueManager(client, "test_user")
+        result = queue_manager.delete_queue(queue_name="test_queue")
         
     print("Result Status: ", result.status, "Success:", result.status, "Details:", result.details, "Replication:", result.replication_result)
     #flush_redis()

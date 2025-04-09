@@ -336,6 +336,31 @@ class QueueReplicationStub(object):
                 request_serializer=replication__service__pb2.CreateQueueRequest.SerializeToString,
                 response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
                 _registered_method=True)
+        self.QueueReplicateDelete = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateDelete',
+                request_serializer=replication__service__pb2.DeleteQueueRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.QueueReplicateEnqueue = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateEnqueue',
+                request_serializer=replication__service__pb2.EnqueueRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.QueueReplicateSubscribe = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateSubscribe',
+                request_serializer=replication__service__pb2.QueueSubscribeRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.QueueReplicateUnsubscribe = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateUnsubscribe',
+                request_serializer=replication__service__pb2.QueueUnsubscribeRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.QueueReplicateDequeue = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateDequeue',
+                request_serializer=replication__service__pb2.DequeueRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
 
 
 class QueueReplicationServicer(object):
@@ -349,12 +374,72 @@ class QueueReplicationServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def QueueReplicateDelete(self, request, context):
+        """Delete queue replication
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueueReplicateEnqueue(self, request, context):
+        """Publish message replication
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueueReplicateSubscribe(self, request, context):
+        """Subscribe user replication
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueueReplicateUnsubscribe(self, request, context):
+        """Unsubscribe user replication
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueueReplicateDequeue(self, request, context):
+        """Dequeue message replication
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_QueueReplicationServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'QueueReplicateCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.QueueReplicateCreate,
                     request_deserializer=replication__service__pb2.CreateQueueRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateDelete': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateDelete,
+                    request_deserializer=replication__service__pb2.DeleteQueueRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateEnqueue': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateEnqueue,
+                    request_deserializer=replication__service__pb2.EnqueueRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateSubscribe': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateSubscribe,
+                    request_deserializer=replication__service__pb2.QueueSubscribeRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateUnsubscribe': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateUnsubscribe,
+                    request_deserializer=replication__service__pb2.QueueUnsubscribeRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateDequeue': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateDequeue,
+                    request_deserializer=replication__service__pb2.DequeueRequest.FromString,
                     response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
             ),
     }
@@ -385,6 +470,141 @@ class QueueReplication(object):
             target,
             '/app.grpc.QueueReplication/QueueReplicateCreate',
             replication__service__pb2.CreateQueueRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateDelete(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateDelete',
+            replication__service__pb2.DeleteQueueRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateEnqueue(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateEnqueue',
+            replication__service__pb2.EnqueueRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateSubscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateSubscribe',
+            replication__service__pb2.QueueSubscribeRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateUnsubscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateUnsubscribe',
+            replication__service__pb2.QueueUnsubscribeRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateDequeue(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateDequeue',
+            replication__service__pb2.DequeueRequest.SerializeToString,
             replication__service__pb2.ReplicationResponse.FromString,
             options,
             channel_credentials,

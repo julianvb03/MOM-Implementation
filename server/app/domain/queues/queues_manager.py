@@ -11,7 +11,9 @@ from app.domain.logger_config import logger
 from app.domain.utils import KeyBuilder
 from app.domain.queues.queues_subscription import SubscriptionService
 from app.domain.queues.queues_validator import QueueValidator
-
+from app.domain.queue_replication_clients import get_source_queue_client, get_target_queue_client
+from app.domain.models import NODES_CONFIG, WHOAMI
+from app.domain.queues.queues_replication import QueueReplicationClient
 class MOMQueueManager:
     """
     This classs handles the management of message queues in a Redis database,
@@ -29,8 +31,28 @@ class MOMQueueManager:
         self.subscriptions = SubscriptionService(self.redis, self.user)
         self.validator = QueueValidator(self.redis, user)
 
+        # Obtener los stubs de replicación
+        replica_stub = get_target_queue_client()
+        source_stub = get_source_queue_client()
+
+        current_node_config = NODES_CONFIG[WHOAMI]
+        replica_node = current_node_config['whoreplica']
+        replica_config = NODES_CONFIG[replica_node]
+        
+        # Crear clientes de replicación con los stubs
+        # replication_client apunta al nodo replicante
+        # replication_principal apunta al nodo principal
+        self.replication_client = QueueReplicationClient(
+        stub=replica_stub,
+        target_node_desc=f"nodo réplica ({replica_node})"
+        )
+        self.replication_principal = QueueReplicationClient(
+            stub=source_stub,
+            target_node_desc=f"nodo principal ({WHOAMI})"
+        )
+
     def create_queue(
-        self, queue_name: str, message_limit: int = 1000
+        self, queue_name: str, message_limit: int = 1000, principal: bool = True, created_at: str = None
     ) -> QueueOperationResult:
         """
         Create a new queue with the specified name and message limit.
@@ -56,25 +78,45 @@ class MOMQueueManager:
             if result.success is True:
                 return result
 
+            if created_at == None:
+                created_at = datetime.now().timestamp()
+
             metadata = {
                 "name": queue_name,
                 "owner": self.user,
-                "created_at": datetime.now().isoformat(),
+                "created_at": created_at,
                 "total_messages": 0,
+                "original_node": int(principal)
             }
 
             self.redis.hset(metadata_key, mapping=metadata)
-            # replicate data on ()
             result = self.subscriptions.subscribe(queue_name)
 
             if result.success is False:
                 self.redis.delete(metadata_key, queue_key)
                 return result
+            
+            # Replication
+            if principal:
+                result = self.replication_client.create_queue(
+                    queue_name=queue_name,
+                    owner=self.user,
+                    created_at=created_at
+                )
+                if result is False:
+                    self.redis.delete(metadata_key, queue_key)
+                    return QueueOperationResult(
+                        success=False,
+                        status=MOMQueueStatus.INTERNAL_ERROR,
+                        details="Queue {queue_name} created successfully",
+                        replication_result=False
+                    )
 
             return QueueOperationResult(
-                True,
-                MOMQueueStatus.QUEUE_CREATED,
-                f"Queue {queue_name} created successfully",
+                success=True,
+                status=MOMQueueStatus.QUEUE_CREATED,
+                details=f"Queue {queue_name} created successfully",
+                replication_result=True
             )
 
         except Exception as e: # pylint: disable=W0718
@@ -83,7 +125,7 @@ class MOMQueueManager:
                 False, MOMQueueStatus.INTERNAL_ERROR, str(e)
             )
 
-    def enqueue(self, message: str, queue_name: str) -> QueueOperationResult:
+    def enqueue(self, message: str, queue_name: str, uuid: str = None, timestamp = None) -> QueueOperationResult:
         """
         Enqueue a message to the specified queue.
         Args:
@@ -106,10 +148,15 @@ class MOMQueueManager:
             # if result.success is False:
             #     return result
 
-            message_id = str(uuid.uuid4())
+            principal = bool(int(self.redis.hget(metadata_key, "original_node")))
+            if principal and uuid is None:
+                message_id = str(uuid.uuid4())
+            if principal and timestamp is None:
+                timestamp = datetime.now(timezone.utc).isoformat()
+
             full_message = {
                 "id": message_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": timestamp,
                 "payload": json.dumps(message),
             }
             self.redis.rpush(queue_key, json.dumps(full_message))
@@ -129,7 +176,7 @@ class MOMQueueManager:
             )
 
     def dequeue(
-        self, queue_name: str, block: bool = False, timeout: int = 0
+        self, queue_name: str, block: bool = False, timeout: int = 0, uuid: str = None
     ) -> QueueOperationResult:
         """
         Dequeue a message from the specified queue.
@@ -233,15 +280,34 @@ class MOMQueueManager:
             if result.success is False:
                 return result
 
+            principal = bool(int(self.redis.hget(metadata_key, "original_node")))
             self.redis.delete(queue_key, metadata_key, subscribers_key)
+            if principal:
+                result = self.replication_client.delete_queue(
+                    queue_name=queue_name,
+                    owner=self.user
+                )
+                if result is False:
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.INTERNAL_ERROR,
+                        details="Queue deleted successfully, but replication failed",
+                        replication_result=False
+                    )
+
+            # Replication
             return QueueOperationResult(
-                True,
-                MOMQueueStatus.SUCCES_OPERATION,
-                f"Queue '{queue_name}' deleted successfully",
+                success=True,
+                status=MOMQueueStatus.SUCCES_OPERATION,
+                details=f"Queue '{queue_name}' deleted successfully",
+                replication_result=True
             )
 
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error deleting queue '%s'",queue_name)
             return QueueOperationResult(
-                False, MOMQueueStatus.INTERNAL_ERROR, str(e)
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details=str(e),
+                replication_result=False
             )
