@@ -100,6 +100,8 @@ class MOMTopicManager:
                         offset_field = TopicKeyBuilder.subscriber_offset_field(self.user) # pylint: disable=C0301
                         pipe.hsetnx(offset_key, offset_field, 0)
 
+                        pipe.execute()  # Ejecuta todo atómicamente
+
                         # Replicar creación del tópico
                         replication_op = False
                         if principal:
@@ -109,15 +111,12 @@ class MOMTopicManager:
 
                         if principal and replication_op == False:
                             # Descartar la transacción si la replicación falla
-                            pipe.discard()
                             return TopicOperationResult(
-                                success=False,
-                                status=MOMTopicStatus.REPLICATION_FAILED,
+                                success=True,
+                                status=MOMTopicStatus.TOPIC_CREATED,
                                 details="Topic not replicated",
                                 replication_result=False
                             )
-
-                        pipe.execute()  # Ejecuta todo atómicamente
 
                         return TopicOperationResult(
                             success=True,
@@ -174,6 +173,13 @@ class MOMTopicManager:
                     "payload": message,
                 }
                 
+                pipe.multi()
+                messages_key = TopicKeyBuilder.messages_key(topic_name)
+                pipe.rpush(messages_key, json.dumps(full_message))
+                metadata_key = TopicKeyBuilder.metadata_key(topic_name)
+                pipe.hincrby(metadata_key, "message_count", 1)
+                pipe.execute()
+
                 # Replicar publicación del mensaje
                 # Para saber si el nodo es principal o replicante se puede mirar en metadata
                 # 
@@ -209,7 +215,6 @@ class MOMTopicManager:
                     replication_op = True
 
                 if (principal and replication_op == False) or (not principal and im_replicating == True and replication_op == False):
-                    pipe.discard()
                     return TopicOperationResult(
                         success=False,
                         status=MOMTopicStatus.REPLICATION_FAILED,
@@ -217,12 +222,6 @@ class MOMTopicManager:
                         replication_result=False
                     )
 
-                pipe.multi()
-                messages_key = TopicKeyBuilder.messages_key(topic_name)
-                pipe.rpush(messages_key, json.dumps(full_message))
-                metadata_key = TopicKeyBuilder.metadata_key(topic_name)
-                pipe.hincrby(metadata_key, "message_count", 1)
-                pipe.execute()
 
                 return TopicOperationResult(
                     success=True,
@@ -336,7 +335,6 @@ class MOMTopicManager:
             # TODO: Corregir la logica para preguntar al zookeeper si el nodo principal o replicante esta up
             principal = bool(int(result_principal))
             replication_op = False
-            print("principal: ", principal, "\n\n\n")
 
             # Manejo de resultados
             if isinstance(result, list):
@@ -616,6 +614,8 @@ class MOMTopicManager:
                 ]
                 pipe.delete(*keys)
 
+                pipe.execute()  # Borrado atómico
+
                 if principal == True:
                     replication_operation = self.replication_client.replicate_delete_topic(
                         topic_name=topic_name, 
@@ -623,15 +623,12 @@ class MOMTopicManager:
                     )
 
                     if replication_operation == False:
-                        pipe.discard()
                         return TopicOperationResult(
-                            success=False,
-                            status=MOMTopicStatus.REPLICATION_FAILED,
+                            success=True,
+                            status=MOMTopicStatus.TOPIC_DELETED,
                             details="Topic not replicated",
                             replication_result=False
                         )
-
-                pipe.execute()  # Borrado atómico
 
                 return TopicOperationResult(
                     success=True,
