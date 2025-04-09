@@ -54,12 +54,22 @@ def subscribe(
         (str): Success message or error message.
     """
     try:
-        logger.info("Attempt to subscribe to %s.", queue_topic.name)
+        queue_topic_type = "Queue" if (
+            queue_topic.type.value == "queue"
+        ) else "Topic"
+        logger.info(
+            "%s attempting to subscribe to %s %s.",
+            auth["username"],
+            queue_topic_type,
+            queue_topic.name,
+        )
 
         # TODO: Implement the logic to create a
         # queue or topic in the message broker.
         # This is a placeholder implementation.
-        return f"Subscribed to {queue_topic.name} successfully."
+        return f"{auth["username"]} subscribed to " \
+            + f"{queue_topic_type} {queue_topic.name}" \
+            + " successfully."
     except ValueError as e:
         raise HTTPException(
             status_code=403,
@@ -116,12 +126,22 @@ def unsubscribe(
         (str): Success message or error message.
     """
     try:
-        logger.info("Attempt to unsubscribe of %s.", queue_topic.name)
+        queue_topic_type = "Queue" if (
+            queue_topic.type.value == "queue"
+        ) else "Topic"
+        logger.info(
+            "%s attempting to unsubscribe to %s %s.",
+            auth["username"],
+            queue_topic_type,
+            queue_topic.name,
+        )
 
         # TODO: Implement the logic to create a
         # queue or topic in the message broker.
         # This is a placeholder implementation.
-        return f"Unsubscribed of {queue_topic.name} successfully."
+        return f"{auth["username"]} unsubscribed to " \
+            + f"{queue_topic_type} {queue_topic.name}" \
+            + " successfully."
     except ValueError as e:
         raise HTTPException(
             status_code=403,
@@ -178,16 +198,22 @@ def send_message(
         (str): Success message or error message.
     """
     try:
+        queue_topic_type = "Queue" if (
+            message_queue_topic.type.value == "queue"
+        ) else "Topic"
         logger.info(
-            "Attempt to publish a message to %s.",
-            message_queue_topic.name
+            "%s attempting to publish a message to %s %s.",
+            auth["username"],
+            queue_topic_type,
+            message_queue_topic.name,
         )
 
         # TODO: Implement the logic to create a
         # queue or topic in the message broker.
         # This is a placeholder implementation.
-        return f"'{message_queue_topic.message}' published to " \
-            + f"{message_queue_topic.name} successfully."
+        return f"'{message_queue_topic.message}' published " \
+            + f"by {auth["username"]} to " \
+            + f"{queue_topic_type} {message_queue_topic.name} successfully."
     except ValueError as e:
         raise HTTPException(
             status_code=403,
@@ -245,16 +271,21 @@ def receive_message(
         (str): Success message or error message.
     """
     try:
+        queue_topic_type = "Queue" if (
+            queue_topic.type.value == "queue"
+        ) else "Topic"
         logger.info(
-            "Attempt to receive a message from %s.",
-            queue_topic.name
+            "%s attempting to receive a message from %s %s.",
+            auth["username"],
+            queue_topic_type,
+            queue_topic.name,
         )
 
         # TODO: Implement the logic to create a
         # queue or topic in the message broker.
         # This is a placeholder implementation.
-        return "'message' received from " \
-            + f"{queue_topic.name} successfully."
+        return f"'message' received by {auth["username"]} from " \
+            + f"{queue_topic_type} {queue_topic.name} successfully."
     except ValueError as e:
         raise HTTPException(
             status_code=403,

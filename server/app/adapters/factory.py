@@ -17,7 +17,7 @@ class ObjectFactory:
     Factory class to create and manage instances of different classes
     """
     _instances = {}
-    
+
     USERS_DATABASE = "UsersDatabase"
     MOM_DATABASE = "MomDatabase"
 
@@ -32,7 +32,7 @@ class ObjectFactory:
             object: An instance of the specified interface
         """
         key = (interface, db_type) if db_type else interface
-        
+
         # Check if the instance already exists for Singleton pattern
         if key in ObjectFactory._instances:
             return ObjectFactory._instances[key]
@@ -54,7 +54,10 @@ class ObjectFactory:
             ObjectFactory._instances[key] = instance
             return instance
         if interface == UserRepository:
-            db_instance = ObjectFactory.get_instance(Database, ObjectFactory.USERS_DATABASE)
+            db_instance = ObjectFactory.get_instance(
+                Database,
+                ObjectFactory.USERS_DATABASE
+            )
             instance = UserRepositoryRedis(db=db_instance)
             ObjectFactory._instances[key] = instance
             return instance

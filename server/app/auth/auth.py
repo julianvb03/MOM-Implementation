@@ -92,7 +92,7 @@ class AuthenticationHandler:
     def authenticate(
         self,
         auth_credentials: HTTPAuthorizationCredentials = Security(security)
-    ) -> str:
+    ) -> Union[dict, None]:
         """
         Wrapper function for token authentication.
         
@@ -101,7 +101,7 @@ class AuthenticationHandler:
                 HTTP authorization credentials.
         
         Returns:
-            (str): User ID if authentication is successful.
+            (dict): User ID if authentication is successful.
         
         Raises:
             HTTPException: If token is expired or invalid.

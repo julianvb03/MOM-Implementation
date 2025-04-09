@@ -61,12 +61,13 @@ def test_subscribe_queue_topic():
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
         headers=headers,
         json={
-            "name": "queue-example"
+            "name": "queue-example",
+            "type": "queue"
         }
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Subscribed to queue-example successfully." == data
+    assert "noadmin subscribed to Queue queue-example successfully." == data
 
 
 def test_subscribe_queue_topic_unauthorized():
@@ -76,7 +77,8 @@ def test_subscribe_queue_topic_unauthorized():
     response = client.post(
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
         json={
-            "name": "queue-example"
+            "name": "queue-example",
+            "type": "queue"
         }
     )
     assert response.status_code == 403
@@ -103,12 +105,13 @@ def test_unsubscribe_queue_topic():
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/unsubscribe",
         headers=headers,
         json={
-            "name": "queue-example"
+            "name": "queue-example",
+            "type": "queue"
         }
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Unsubscribed of queue-example successfully." == data
+    assert "noadmin unsubscribed to Queue queue-example successfully." == data
 
 
 def test_unsubscribe_queue_topic_unauthorized():
@@ -118,7 +121,8 @@ def test_unsubscribe_queue_topic_unauthorized():
     response = client.post(
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/unsubscribe",
         json={
-            "name": "queue-example"
+            "name": "queue-example",
+            "type": "queue"
         }
     )
     assert response.status_code == 403
@@ -146,13 +150,14 @@ def test_send():
         headers=headers,
         json={
             "name": "topic-example",
+            "type": "topic",
             "message": "Hello, World!"
         }
     )
     assert response.status_code == 200
     data = response.json()
-    assert "'Hello, World!' published " \
-        + "to topic-example successfully." == data
+    assert "'Hello, World!' published by noadmin " \
+        + "to Topic topic-example successfully." == data
 
 
 def test_send_unauthorized():
@@ -163,6 +168,7 @@ def test_send_unauthorized():
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
         json={
             "name": "topic-example",
+            "type": "topic",
             "message": "Hello, World!"
         }
     )
@@ -190,12 +196,13 @@ def test_receive():
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
         headers=headers,
         json={
-            "name": "queue-example"
+            "name": "queue-example",
+            "type": "queue"
         }
     )
     assert response.status_code == 200
     data = response.json()
-    assert "'message' received from queue-example successfully." == data
+    assert "'message' received by noadmin from Queue queue-example successfully." == data
 
 
 def test_receive_unauthorized():
@@ -205,7 +212,8 @@ def test_receive_unauthorized():
     response = client.post(
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
         json={
-            "name": "queue-example"
+            "name": "queue-example",
+            "type": "queue"
         }
     )
     assert response.status_code == 403

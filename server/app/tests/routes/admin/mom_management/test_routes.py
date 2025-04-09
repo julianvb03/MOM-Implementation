@@ -88,9 +88,9 @@ def test_delete_queue_topic():
         "Authorization": f"{token_type} {token}"
     }
     response = client.delete(
-        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/delete/queue-example",
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/delete/queue-example?mom_type=queue",
         headers=headers
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Queue/Topic queue-example removed successfully." == data
+    assert "Queue queue-example removed successfully." == data

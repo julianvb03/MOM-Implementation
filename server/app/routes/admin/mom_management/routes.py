@@ -5,9 +5,9 @@ from app.auth.auth import auth_handler
 from app.config.limiter import limiter
 from app.config.logging import logger
 from app.dtos.general_dtos import ResponseError
-from app.dtos.admin.mom_management_dto import CreateQueueTopic
+from app.dtos.admin.mom_management_dto import QueueTopic, MomType
 from app.utils.exceptions import raise_exception
-from fastapi import APIRouter, HTTPException, Request, status, Depends
+from fastapi import APIRouter, HTTPException, Request, status, Depends, Query
 from slowapi.errors import RateLimitExceeded
 
 
@@ -41,14 +41,14 @@ router = APIRouter()
 @limiter.limit("15/minute")
 def create_queue_topic(
     request: Request,
-    queue_topic: CreateQueueTopic,
+    queue_topic: QueueTopic,
     auth: dict = Depends(auth_handler.authenticate_as_admin)
 ): # pylint: disable=W0613
     """
     Endpoint to create a topic or queue in the message broker.
     
     Args:
-        queue_topic (CreateQueueTopic): Queue or topic to be created.
+        queue_topic (QueueTopic): Queue or topic to be created.
         auth (dict): Authenticated user information.
     Returns:
         (str): Success message or error message.
@@ -111,6 +111,11 @@ def create_queue_topic(
 def delete_queue_topic(
     request: Request,
     name: str,
+    mom_type: MomType = Query(
+        ...,
+        description="Type of the queue or topic to delete",
+        examples="queue"
+    ),
     auth: dict = Depends(auth_handler.authenticate_as_admin)
 ): # pylint: disable=W0613
     """
@@ -118,19 +123,23 @@ def delete_queue_topic(
     
     Args:
         name (str): Name of the queue or topic to be deleted.
+        type (MomType): Type of the queue or topic to be deleted.
         auth (dict): Authenticated user information.
     Returns:
         (str): Success message or error message.
     """
     try:
+        queue_topic = QueueTopic(name=name, type=mom_type)
         logger.info(
-            "Queue/Topic removal attempt for %s.",
+            "%s removal attempt for %s.",
+            "Queue" if queue_topic.type.value == "queue" else "Topic",
+            queue_topic.name
         )
 
         # TODO: Implement the logic to create a
         # queue or topic in the message broker.
         # This is a placeholder implementation.
-        return "Queue/Topic " \
+        return f"{"Queue" if queue_topic.type == MomType.QUEUE else "Topic"} " \
             + f"{name} removed successfully."
     except ValueError as e:
         raise HTTPException(
