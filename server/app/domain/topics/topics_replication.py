@@ -10,7 +10,7 @@ from app.grpc.replication_service_pb2 import (
     TopicSubscribeRequest,
     TopicUnsubscribeRequest,
 )
-from app.grpc.replication_service_pb2_grpc import TopicReplicationStub
+from app.grpc.replication_service_pb2_grpc import TopicReplicationStub, QueueReplicationStub
 
 class TopicReplicationClient:
     """Client for topic replication via gRPC"""
@@ -54,7 +54,7 @@ class TopicReplicationClient:
                 return False
                 
         except grpc.RpcError as e:
-            logger.error(f"REPLICATION ERROR (create_topic): gRPC error replicating to {self.target_node_desc}: {e.status()} - {e.details()}")
+            logger.error(f"REPLICATION ERROR (create_topic): gRPC error replicating to")
             return False
         except Exception as e:
             logger.error(f"REPLICATION ERROR (create_topic): Error inesperado replicating to {self.target_node_desc}: {str(e)}")
@@ -91,7 +91,7 @@ class TopicReplicationClient:
                 return False
 
         except grpc.RpcError as e:
-            logger.error(f"REPLICATION ERROR (delete_topic): gRPC error replicating to {self.target_node_desc}: {e.status()} - {e.details()}")
+            logger.error(f"REPLICATION ERROR (delete_topic): gRPC error replicating to {self.target_node_desc}")
             return False
         except Exception as e:
             logger.error(f"REPLICATION ERROR (delete_topic): Error inesperado replicating to {self.target_node_desc}: {str(e)}")
@@ -132,7 +132,7 @@ class TopicReplicationClient:
                 return False
 
         except grpc.RpcError as e:
-            logger.error(f"REPLICATION ERROR (publish_message): gRPC error replicating to {self.target_node_desc}: {e.status()} - {e.details()}")
+            logger.error(f"REPLICATION ERROR (publish_message): gRPC error replicating to {self.target_node_desc}")
             return False
         except Exception as e:
             logger.error(f"REPLICATION ERROR (publish_message): Error inesperado replicating to {self.target_node_desc}: {str(e)}")
@@ -171,7 +171,7 @@ class TopicReplicationClient:
                 return False
 
         except grpc.RpcError as e:
-            logger.error(f"REPLICATION ERROR (consume_message): gRPC error replicating to {self.target_node_desc}: {e.status()} - {e.details()}")
+            logger.error(f"REPLICATION ERROR (consume_message): gRPC error replicating to {self.target_node_desc}")
             return False
         except Exception as e:
             logger.error(f"REPLICATION ERROR (consume_message): Error inesperado replicating to {self.target_node_desc}: {str(e)}")
@@ -208,7 +208,7 @@ class TopicReplicationClient:
                 return False
 
         except grpc.RpcError as e:
-            logger.error(f"REPLICATION ERROR (subscribe): gRPC error replicating to {self.target_node_desc}: {e.status()} - {e.details()}")
+            logger.error(f"REPLICATION ERROR (subscribe): gRPC error replicating to {self.target_node_desc}")
             return False
         except Exception as e:
             logger.error(f"REPLICATION ERROR (subscribe): Error inesperado replicating to {self.target_node_desc}: {str(e)}")
@@ -245,7 +245,7 @@ class TopicReplicationClient:
                 return False
 
         except grpc.RpcError as e:
-            logger.error(f"REPLICATION ERROR (unsubscribe): gRPC error replicating to {self.target_node_desc}: {e.status()} - {e.details()}")
+            logger.error(f"REPLICATION ERROR (unsubscribe): gRPC error replicating to {self.target_node_desc}")
             return False
         except Exception as e:
             logger.error(f"REPLICATION ERROR (unsubscribe): Error inesperado replicating to {self.target_node_desc}: {str(e)}")

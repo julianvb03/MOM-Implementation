@@ -216,8 +216,8 @@ class MOMTopicManager:
 
                 if (principal and replication_op == False) or (not principal and im_replicating == True and replication_op == False):
                     return TopicOperationResult(
-                        success=False,
-                        status=MOMTopicStatus.REPLICATION_FAILED,
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_PUBLISHED,
                         details="Message not replicated",
                         replication_result=False
                     )

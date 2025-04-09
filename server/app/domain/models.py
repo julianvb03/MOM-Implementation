@@ -55,8 +55,7 @@ class QueueOperationResult:
     success: bool
     status: MOMQueueStatus
     details: Optional[str] = None
-    replication_status: ReplicationStatus = None
-    replication_message: str = None
+    replication_result: bool = None
 
 class QueueException(Exception):
     def __init__(self, status: MOMQueueStatus, message: str = ""):
