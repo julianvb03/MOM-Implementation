@@ -165,7 +165,16 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 message="Redis connection failed"
             )
         
-        topic_manager = MOMTopicManager(db, request.subscriber)
+        subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
+        is_subscribed = db.sismember(subscribers_key, request.subscriber)
+        if not is_subscribed:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("User is not subscribed to this topic")
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message="User is not subscribed to this topic"
+            )
         
         # Actualizar el offset del suscriptor
         offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
@@ -178,6 +187,122 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 status_code=StatusCode.REPLICATION_SUCCESS,
                 message="Offset updated successfully"
             )
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+        
+    def TopicReplicateSubscribe(self, request, context):
+        db = create_redis2_connection()
+        if db is None:
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details("Redis connection failed")
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message="Redis connection failed"
+            )
+        
+        try:
+            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
+            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber)
+            
+            metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
+            if not db.exists(metadata_key):
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Topic does not exist")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Topic does not exist"
+                )
+            
+            if db.sismember(subscribers_key, request.subscriber):
+                context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+                context.set_details("User is already subscribed to this topic")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="User is already subscribed to this topic"
+                )
+            message_count = int(db.hget(metadata_key, "message_count") or 0)
+            db.sadd(subscribers_key, request.subscriber)
+            db.hset(offset_key, offset_field, message_count)
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="User subscribed successfully"
+            )
+            
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def TopicReplicateUnsubscribe(self, request, context):
+        db = create_redis2_connection()
+        if db is None:
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details("Redis connection failed")
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message="Redis connection failed"
+            )
+        
+        try:
+            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
+            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber)
+            
+            metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
+            if not db.exists(metadata_key):
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Topic does not exist")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Topic does not exist"
+                )
+            
+            if not db.sismember(subscribers_key, request.subscriber):
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("User is not subscribed to this topic")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="User is not subscribed to this topic"
+                )
+            
+            owner = db.hget(metadata_key, "owner")
+            if request.subscriber == owner:
+                context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                context.set_details("Topic owner cannot unsubscribe")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Topic owner cannot unsubscribe"
+                )
+            
+            db.srem(subscribers_key, request.subscriber)
+            db.hdel(offset_key, offset_field)
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="User unsubscribed successfully"
+            )
+            
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))

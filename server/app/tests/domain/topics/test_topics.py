@@ -17,14 +17,14 @@ from app.domain.utils import TopicKeyBuilder
 
 
 # Erase Redis data before each test
-@pytest.fixture(autouse=True)
-def clear_redis():
-    """Clear Redis database before and after each test"""
-    db = ObjectFactory.get_instance(Database)
-    client = db.get_client()
-    client.flushdb()  # Before test
-    yield
-    client.flushdb()  # After test
+# @pytest.fixture(autouse=True)
+# def clear_redis():
+#     """Clear Redis database before and after each test"""
+#     db = ObjectFactory.get_instance(Database)
+#     client = db.get_client()
+#     client.flushdb()  # Before test
+#     yield
+#     client.flushdb()  # After test
 
 REDIS2_CONFIG = {
     'host': 'localhost',
@@ -50,13 +50,13 @@ def create_redis2_connection():
     finally:
         r.close()
 
-@pytest.fixture(autouse=True)
-def create_redis2_connection_fixture():
-    """Fixture to provide a connection to redis2"""
-    db = create_redis2_connection()
-    db.flushdb()
-    yield db
-    db.flushdb()
+# @pytest.fixture(autouse=True)
+# def create_redis2_connection_fixture():
+#     """Fixture to provide a connection to redis2"""
+#     db = create_redis2_connection()
+#     db.flushdb()
+#     yield db
+#     db.flushdb()
 
 
 @pytest.fixture(name="redis_connection")
@@ -614,7 +614,7 @@ def test_multiple_publishers_and_consumers(redis_connection, topic_manager, user
     assert result.details["messages_in_queue"] == total_messages
     
     # Step 6: Run cleanup and verify no messages were deleted
-    # (since all subscribers have consumed their messages but messages remain for record)
+    # (since all subscribers have co nsumed their messages but messages remain for record)
     deleted_count = topic_manager._cleanup_processed_messages(topic_name)
     
     # All subscribers have read their messages, so the minimum offset should be the total count

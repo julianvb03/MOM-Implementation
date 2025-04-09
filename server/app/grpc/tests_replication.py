@@ -32,11 +32,19 @@ if __name__ == "__main__":
 
     if n_test == 2:
         topic_manager = MOMTopicManager(client, "test_user")
-        result = topic_manager.publish("test_message_timido", "test_topic")
+        result = topic_manager.publish("test_message_timidont", "test_topic")
 
     if n_test == 3:
         topic_manager = MOMTopicManager(client, "test_user")
         result = topic_manager.consume("test_topic")
+    
+    if n_test == 4:
+        topic_manager = MOMTopicManager(client, "test_user2")
+        result = topic_manager.subscriptions.subscribe("test_topic")
+
+    if n_test == 5:
+        topic_manager = MOMTopicManager(client, "test_user2")
+        result = topic_manager.subscriptions.unsubscribe("test_topic")
         
     print("Result Status: ", result.status, "Success:", result.status, "Details:", result.details, "Replication:", result.replication_result)
     #flush_redis()

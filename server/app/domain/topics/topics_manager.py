@@ -14,7 +14,8 @@ from app.domain.utils import TopicKeyBuilder
 from app.domain.topics.topics_subscription import TopicSubscriptionService
 from app.domain.topics.topics_validator import TopicValidator
 from app.domain.topics.topics_replication import TopicReplicationClient
-
+from app.domain.replication_clients import get_replica_client_stub, get_source_client_stub
+from app.domain.models import NODES_CONFIG, WHOAMI
 
 class MOMTopicManager:
     """
@@ -28,8 +29,26 @@ class MOMTopicManager:
         self.user = user
         self.subscriptions = TopicSubscriptionService(self.redis, self.user)
         self.validator = TopicValidator(self.redis, user)
-        self.replication_client = TopicReplicationClient()
-        self.replication_principal = TopicReplicationClient(to_original_node=True)
+
+        # Obtener los stubs de replicación
+        replica_stub = get_replica_client_stub()
+        source_stub = get_source_client_stub()
+
+        current_node_config = NODES_CONFIG[WHOAMI]
+        replica_node = current_node_config['whoreplica']
+        replica_config = NODES_CONFIG[replica_node]
+        
+        # Crear clientes de replicación con los stubs
+        # replication_client apunta al nodo replicante
+        # replication_principal apunta al nodo principal
+        self.replication_client = TopicReplicationClient(
+        stub=replica_stub,
+        target_node_desc=f"nodo réplica ({replica_node})"
+        )
+        self.replication_principal = TopicReplicationClient(
+            stub=source_stub,
+            target_node_desc=f"nodo principal ({WHOAMI})"
+        )
 
     def create_topic(self, topic_name: str, principal = True, created_at = None) -> TopicOperationResult:
         """
@@ -173,18 +192,14 @@ class MOMTopicManager:
                 # TODO: preguntar al zookeeper si el nodo principal o replicante esta up
                 #zookeper_validation = ...
                 replication_op = False
-                logger.critical("principal: %s", principal)
-                logger.critical("im_replicating: %s", im_replicating)
-                logger.critical("principal and im_replicating: %s", principal and im_replicating == False)
-                logger.critical("not principal and im_replicating: %s", not principal and im_replicating == False)
 
                 if principal and im_replicating == False:
-                    logger.critical("replicando con replication_client")
+                    logger.debug("replicando con replication_client")
                     replication_op = self.replication_client.replicate_publish_message(
                         topic_name, self.user, message, timestamp
                     )
                 elif not principal and im_replicating == False:
-                    logger.critical("replicando con replication_principal")
+                    logger.debug("replicando con replication_principal")
                     replication_op = self.replication_principal.replicate_publish_message(
                         topic_name, self.user, message, timestamp
                     )
@@ -234,70 +249,78 @@ class MOMTopicManager:
             topic_name (str): The name of the topic to consume from.
             count (int): Maximum number of messages to consume (default: 1).
             self_consume (bool): Whether the consume is from the same user that published the message.
-
+            im_replicating (bool): Whether the consume is being replicated.
         Returns:
             TopicOperationResult: Result containing consumed string messages.
         """
         try:
+            subscribers_key = TopicKeyBuilder.subscribers_key(topic_name)
+            if not self.redis.sismember(subscribers_key, self.user):
+                return TopicOperationResult(
+                    success=False,
+                    status=MOMTopicStatus.NOT_SUBSCRIBED,
+                    details="User is not subscribed to this topic"
+                )
+            
             lua_script = """
-        local offset_key = KEYS[1]
-        local messages_key = KEYS[2]
-        local metadata_key = KEYS[3]
-        local user = ARGV[1]
+            local offset_key = KEYS[1]
+            local messages_key = KEYS[2]
+            local metadata_key = KEYS[3]
+            local user = ARGV[1]
 
-        -- Obtener campo del offset
-        local offset_field = "subscriber_offset:" .. user
-        local current_offset = tonumber(redis.call('HGET', offset_key, offset_field))
-        
-        -- Validar offset inicializado
-        if not current_offset then
-            return {"ERROR", "OFFSET_NOT_INITIALIZED"}
-        end
+            -- Obtener campo del offset
+            local offset_field = "subscriber_offset:" .. user
+            local current_offset = tonumber(redis.call('HGET', offset_key, offset_field))
+            
+            -- Validar offset inicializado
+            if not current_offset then
+                return {"ERROR", "OFFSET_NOT_INITIALIZED"}
+            end
 
-        -- Obtener mensajes procesados
-        local total_deleted = tonumber(redis.call('HGET', metadata_key, 'processed_count') or 0)
+            -- Obtener mensajes procesados
+            local total_deleted = tonumber(redis.call('HGET', metadata_key, 'processed_count') or 0)
 
-        -- Calcular offset real
-        local real_offset = current_offset - total_deleted
-        if real_offset < 0 then
-            return {"ERROR", "INVALID_OFFSET"}
-        end
+            -- Calcular offset real
+            local real_offset = current_offset - total_deleted
+            if real_offset < 0 then
+                return {"ERROR", "INVALID_OFFSET"}
+            end
 
-        -- Verificar si hay mensajes
-        local total_messages = redis.call('LLEN', messages_key)
-        if real_offset >= total_messages then
-            return {"NO_MESSAGES", tostring(current_offset)}
-        end
+            -- Verificar si hay mensajes
+            local total_messages = redis.call('LLEN', messages_key)
+            if real_offset >= total_messages then
+                return {"NO_MESSAGES", tostring(current_offset)}
+            end
 
-        -- Leer mensaje
-        local raw_message = redis.call('LINDEX', messages_key, real_offset)
-        if not raw_message then
-            return {"NO_MESSAGES", tostring(current_offset)}
-        end
+            -- Leer mensaje
+            local raw_message = redis.call('LINDEX', messages_key, real_offset)
+            if not raw_message then
+                return {"NO_MESSAGES", tostring(current_offset)}
+            end
 
-        -- Decodificar mensaje
-        local success, message_data = pcall(cjson.decode, raw_message)
-        if not success or type(message_data) ~= "table" then
-            return {"ERROR", "MESSAGE_CORRUPTED"}
-        end
+            -- Decodificar mensaje
+            local success, message_data = pcall(cjson.decode, raw_message)
+            if not success or type(message_data) ~= "table" then
+                return {"ERROR", "MESSAGE_CORRUPTED"}
+            end
 
-        -- Saltar mensajes propios
-        if message_data.publisher == user then
+            -- Saltar mensajes propios
+            if message_data.publisher == user then
+                local new_offset = current_offset + 1
+                redis.call('HSET', offset_key, offset_field, new_offset)
+                local new_real_offset = new_offset - total_deleted
+                if new_real_offset >= redis.call('LLEN', messages_key) then
+                    return {"NO_MESSAGES", tostring(new_offset)}
+                else
+                    return {"SELF_MESSAGE", tostring(new_offset)}
+                end
+            end
+
+            -- Actualizar offset y retornar mensaje
             local new_offset = current_offset + 1
             redis.call('HSET', offset_key, offset_field, new_offset)
-            local new_real_offset = new_offset - total_deleted
-            if new_real_offset >= redis.call('LLEN', messages_key) then
-                return {"NO_MESSAGES", tostring(new_offset)}
-            else
-                return {"SELF_MESSAGE", tostring(new_offset)}
-            end
-        end
-
-        -- Actualizar offset y retornar mensaje
-        local new_offset = current_offset + 1
-        redis.call('HSET', offset_key, offset_field, new_offset)
-        return {"MESSAGE", raw_message, tostring(new_offset)}
-        """
+            return {"MESSAGE", raw_message, tostring(new_offset)}
+            """
 
             keys = [
                 TopicKeyBuilder.subscriber_offsets_key(topic_name),
@@ -306,6 +329,14 @@ class MOMTopicManager:
             ]
 
             result = self.redis.eval(lua_script, 3, *keys, self.user)
+
+            # Validar si soy el mom principal para este topico
+            result_principal = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node")
+
+            # TODO: Corregir la logica para preguntar al zookeeper si el nodo principal o replicante esta up
+            principal = bool(int(result_principal))
+            replication_op = False
+            print("principal: ", principal, "\n\n\n")
 
             # Manejo de resultados
             if isinstance(result, list):
@@ -319,9 +350,17 @@ class MOMTopicManager:
                     # el que envio el mensaje
                     if self_consume == True:
                         new_offset = int(result[1])
-                        self.replication_client.replicate_consume_message(
-                            topic_name, self.user, new_offset
-                        )
+                        
+                        if principal:
+                            replication_op = self.replication_client.replicate_consume_message(
+                                topic_name, self.user, new_offset
+                            )
+                        elif not principal:
+                            replication_op = self.replication_principal.replicate_consume_message(
+                                topic_name, self.user, new_offset
+                            )
+                        else:
+                            replication_op = False
 
                     return TopicOperationResult(
                         success=True,
@@ -337,9 +376,16 @@ class MOMTopicManager:
                     message_data = json.loads(result[1])
                     new_offset = int(result[2])
 
-                    replication_op = self.replication_client.replicate_consume_message(
-                        topic_name, self.user, new_offset
-                    )
+                    if principal:
+                        replication_op = self.replication_client.replicate_consume_message(
+                            topic_name, self.user, new_offset
+                        )
+                    elif not principal:
+                        replication_op = self.replication_principal.replicate_consume_message(
+                            topic_name, self.user, new_offset
+                        )
+                    else:
+                        replication_op = False
 
                     return TopicOperationResult(
                         success=True,
