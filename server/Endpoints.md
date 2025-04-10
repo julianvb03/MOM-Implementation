@@ -287,11 +287,13 @@ Subscribes an authenticated user to a queue or topic in the message broker.
 | Field | Type   | Required | Description                          |
 |-------|--------|----------|--------------------------------------|
 | name  | string | Yes      | Name of the queue or topic to subscribe to |
+| type  | string | Yes      | Type ("queue" or "topic")            |
 
 ##### Example Request Body:
 ```json
 {
-    "name": "queue-example"
+    "name": "queue-example",
+    "type": "queue"
 }
 ```
 
@@ -365,11 +367,13 @@ Unsubscribes an authenticated user from a queue or topic in the message broker.
 | Field | Type   | Required | Description                            |
 |-------|--------|----------|----------------------------------------|
 | name  | string | Yes      | Name of the queue or topic to unsubscribe from |
+| type  | string | Yes      | Type ("queue" or "topic")            |
 
 ##### Example Request Body:
 ```json
 {
-    "name": "queue-example"
+    "name": "queue-example",
+    "type": "queue"
 }
 ```
 
@@ -444,12 +448,14 @@ Sends a message to a queue or topic in the message broker by an authenticated us
 |---------|--------|----------|--------------------------------------|
 | name    | string | Yes      | Name of the queue or topic           |
 | message | string | Yes      | Message content to send              |
+| type  | string | Yes      | Type ("queue" or "topic")            |
 
 ##### Example Request Body:
 ```json
 {
     "name": "queue-example",
-    "message": "Hello, world!"
+    "message": "Hello, world!",
+    "type": "queue"
 }
 ```
 
@@ -523,11 +529,13 @@ Receives a message from a queue or topic in the message broker for an authentica
 | Field | Type   | Required | Description                          |
 |-------|--------|----------|--------------------------------------|
 | name  | string | Yes      | Name of the queue or topic           |
+| type  | string | Yes      | Type ("queue" or "topic")            |
 
 ##### Example Request Body:
 ```json
 {
-    "name": "queue-example"
+    "name": "queue-example",
+    "type": "queue"
 }
 ```
 
@@ -827,7 +835,7 @@ Creates a new queue or topic in the message broker (admin-only).
 ### Delete Queue/Topic
 
 #### **Endpoint**
-`/queue_topic/delete/{name}`
+`/queue_topic/delete/{name}?type={type}`
 
 #### **Method**
 `DELETE`
@@ -843,6 +851,7 @@ Deletes a queue or topic from the message broker by name (admin-only).
 | Field | Type   | Required | Description                          |
 |-------|--------|----------|--------------------------------------|
 | name  | string | Yes      | Name of the queue or topic to delete |
+| type  | string | Yes      | Type ("queue" or "topic")            |
 
 - **Headers**:
   | Field         | Type   | Required | Description                  |
@@ -901,8 +910,7 @@ Deletes a queue or topic from the message broker by name (admin-only).
 1. **DTOs**:
    - `UserDto`: Contains `username` and `password` fields.
    - `UserLoginResponse`: Contains `access_token` and `token_type`.
-   - `QueueTopic`: Contains a `name` field.
-   - `CreateQueueTopic`: Extends `QueueTopic` with a `type` field (enum: `"queue"`, `"topic"`).
+   - `QueueTopic`: Contains a `name` field and a `type` field (enum: `"queue"`, `"topic"`).
    - `MessageQueueTopic`: Contains `name` and `message` fields.
    - `ResponseError`: Contains `success` (boolean) and `error` (string).
 
