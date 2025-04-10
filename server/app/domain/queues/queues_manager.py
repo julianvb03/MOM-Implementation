@@ -110,7 +110,7 @@ class MOMQueueManager:
                     return QueueOperationResult(
                         success=False,
                         status=MOMQueueStatus.INTERNAL_ERROR,
-                        details="Queue {queue_name} created successfully",
+                        details=f"Queue {queue_name} created successfully",
                         replication_result=False
                     )
 
@@ -197,7 +197,7 @@ class MOMQueueManager:
                 replication_result=replication_result
             )
         except Exception as e: # pylint: disable=W0718
-            logger.exception("Error dequeueing message to '%s'",queue_name)
+            logger.exception("Error enqueueing message to '%s'", queue_name)
             return QueueOperationResult(
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
