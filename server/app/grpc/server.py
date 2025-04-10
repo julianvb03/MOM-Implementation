@@ -15,23 +15,17 @@ from app.grpc.replication_service_pb2 import ReplicationResponse, StatusCode
 from app.grpc import replication_service_pb2_grpc
 import json
 
-# Configuración de Redis
-REDIS2_CONFIG = {
-    "host": "localhost",
-    "port": 6380,
-    "password": os.getenv("REDIS_PASSWORD"),
-    "decode_responses": True,
-}
+from app.adapters.db import Database
+from app.adapters.factory import ObjectFactory
+
 
 
 def create_redis2_connection():
     """Crea y retorna una conexión a redis2"""
     try:
-        r = redis.Redis(**REDIS2_CONFIG)
-        if r.ping():
-            print("Conexión exitosa a redis2")
-            return r
-        raise ConnectionError("No se pudo conectar a redis2")
+        db = ObjectFactory.get_instance(Database)
+        client = db.get_client()
+        return client
     except redis.AuthenticationError:
         print("Error de autenticación. Verifica la contraseña")
         return None
@@ -39,7 +33,7 @@ def create_redis2_connection():
         print("No se pudo conectar a redis2. Verifica si el servicio está corriendo") # pylint: disable=C0301
         return None
     finally:
-        r.close()
+        client.close()
 
 
 class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServicer): # pylint: disable=C0301
