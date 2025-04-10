@@ -108,9 +108,10 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
     1. **.env**: Create a `.env` file in the root directory of the project.
     2. **Environment Variables**: Copy the content of the `.env.example` file to the `.env` file and modify the values as needed.
     3. **Execute**: Execute `source .env` in Linux or Mac, or `Get-Content .env | ForEach-Object { if ($_ -match '^\s*#|^\s*$') { return }; $line = ($_ -replace '#.*$', '').Trim(); if ($line -match '^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$') { $name = $Matches[1]; $value = $Matches[2].Trim(); if ($value -match '^"(.*)"$') { $value = $Matches[1] } elseif ($value -match "^'(.*)'$") { $value = $Matches[1] }; Set-Item -Path "Env:$name" -Value $value } }` in Windows to load the environment variables.
-6. **Execution**: Execute `uvicorn app.app:app --reload --port 8000` to initialize the API in the 8000 port. 
-7. **Tests Execution**: Execute `pytest` to run the tests. The tests are located in the `tests` folder.
-8. **Linter Execution**: Execute `pylint --rcfile=.pylintrc app/` to run the linter. The linter is configured to use the `.pylintrc` file in the root directory.
+6. **Execution**: Execute `uvicorn app.app:app --reload --port 8000` to initialize the API in the 8000 port.
+7. **gRPC Execution**: Exeture `python -m app.grpc.server` 
+8. **Tests Execution**: Execute `pytest` to run the tests. The tests are located in the `tests` folder.
+9. **Linter Execution**: Execute `pylint --rcfile=.pylintrc app/` to run the linter. The linter is configured to use the `.pylintrc` file in the root directory.
 
 ## Docker Image
 
