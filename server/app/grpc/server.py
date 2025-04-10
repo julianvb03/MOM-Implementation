@@ -1,3 +1,8 @@
+"""
+Server for managing topic and queue replication.
+For allow the comunnication between the nodes
+wit grpc.
+"""
 from concurrent import futures
 import grpc
 import os
@@ -10,13 +15,14 @@ from app.grpc.replication_service_pb2 import ReplicationResponse, StatusCode
 from app.grpc import replication_service_pb2_grpc
 import json
 
-# Configuración de Redis (mantén tu lógica actual)
+# Configuración de Redis
 REDIS2_CONFIG = {
-    'host': 'localhost',
-    'port': 6380,
-    'password': os.getenv('REDIS_PASSWORD'),
-    'decode_responses': True
+    "host": "localhost",
+    "port": 6380,
+    "password": os.getenv("REDIS_PASSWORD"),
+    "decode_responses": True,
 }
+
 
 def create_redis2_connection():
     """Crea y retorna una conexión a redis2"""
@@ -30,12 +36,16 @@ def create_redis2_connection():
         print("Error de autenticación. Verifica la contraseña")
         return None
     except redis.ConnectionError:
-        print("No se pudo conectar a redis2. Verifica si el servicio está corriendo")
+        print("No se pudo conectar a redis2. Verifica si el servicio está corriendo") # pylint: disable=C0301
         return None
     finally:
         r.close()
 
-class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServicer):
+
+class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServicer): # pylint: disable=C0301
+    """
+    Service for managing topic replication.
+    """
     def TopicReplicateCreate(self, request, context):
         try:
             db = create_redis2_connection()
@@ -45,31 +55,31 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
 
             topic_manager = MOMTopicManager(db, request.owner)
             result = topic_manager.create_topic(
                 topic_name=request.topic_name,
                 principal=False,
-                created_at=request.created_at
+                created_at=request.created_at,
             )
-            
+
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value
+                    message=result.status.value,
                 )
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Topic replicated successfully"
+                message="Topic replicated successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
@@ -77,7 +87,7 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 status_code=StatusCode.REPLICATION_FAILED,
                 message=str(e)
             )
-    
+
     def TopicReplicateDelete(self, request, context):
         try:
             db = create_redis2_connection()
@@ -87,11 +97,11 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-            
+
             topic_manager = MOMTopicManager(db, request.requester)
-            
+
             # Verificar si el tópico existe
             metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
             if not db.exists(metadata_key):
@@ -100,7 +110,7 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Topic does not exist"
+                    message="Topic does not exist",
                 )
 
             # Solo el nodo principal puede eliminar un tópico
@@ -110,29 +120,28 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Permission denied"
+                    message="Permission denied",
                 )
-            
+
             result = topic_manager.delete_topic(
-                topic_name=request.topic_name,
-                principal=False
+                topic_name=request.topic_name, principal=False
             )
-            
+
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value
+                    message=result.status.value,
                 )
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Topic replicated successfully"
+                message="Topic replicated successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
@@ -150,32 +159,32 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-            
+
             topic_manager = MOMTopicManager(db, request.publisher)
             result = topic_manager.publish(
                 message=request.message,
                 topic_name=request.topic_name,
                 timestamp=request.timestamp,
-                im_replicating=True
+                im_replicating=True,
             )
-            
+
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value
+                    message=result.status.value,
                 )
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Message replicated successfully"
+                message="Message replicated successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
@@ -193,10 +202,10 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-            
-            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
+
+            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name) # pylint: disable=C0301
             is_subscribed = db.sismember(subscribers_key, request.subscriber)
             if not is_subscribed:
                 context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
@@ -204,20 +213,20 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="User is not subscribed to this topic"
+                    message="User is not subscribed to this topic",
                 )
-            
+
             # Actualizar el offset del suscriptor
-            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
-            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber)
-        
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name) # pylint: disable=C0301
+            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber) # pylint: disable=C0301
+
             db.hset(offset_key, offset_field, request.offset)
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Offset updated successfully"
+                message="Offset updated successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
@@ -225,7 +234,7 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 status_code=StatusCode.REPLICATION_FAILED,
                 message=str(e)
             )
-        
+
     def TopicReplicateSubscribe(self, request, context):
         try:
             db = create_redis2_connection()
@@ -235,13 +244,13 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
 
-            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
-            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
-            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber)
-            
+            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name) # pylint: disable=C0301
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name) # pylint: disable=C0301
+            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber) # pylint: disable=C0301
+
             metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
             if not db.exists(metadata_key):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -249,34 +258,32 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Topic does not exist"
+                    message="Topic does not exist",
                 )
-            
+
             if db.sismember(subscribers_key, request.subscriber):
                 context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                 context.set_details("User is already subscribed to this topic")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="User is already subscribed to this topic"
+                    message="User is already subscribed to this topic",
                 )
             message_count = int(db.hget(metadata_key, "message_count") or 0)
             db.sadd(subscribers_key, request.subscriber)
             db.hset(offset_key, offset_field, message_count)
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="User subscribed successfully"
+                message="User subscribed successfully",
             )
-            
-        except Exception as e:
+
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
     def TopicReplicateUnsubscribe(self, request, context):
@@ -288,13 +295,13 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-        
-            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
-            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
-            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber)
-            
+
+            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name) # pylint: disable=C0301
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name) # pylint: disable=C0301
+            offset_field = TopicKeyBuilder.subscriber_offset_field(request.subscriber) # pylint: disable=C0301
+
             metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
             if not db.exists(metadata_key):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -302,18 +309,18 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Topic does not exist"
+                    message="Topic does not exist",
                 )
-            
+
             if not db.sismember(subscribers_key, request.subscriber):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("User is not subscribed to this topic")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="User is not subscribed to this topic"
+                    message="User is not subscribed to this topic",
                 )
-            
+
             owner = db.hget(metadata_key, "owner")
             if request.subscriber == owner:
                 context.set_code(grpc.StatusCode.PERMISSION_DENIED)
@@ -321,28 +328,30 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Topic owner cannot unsubscribe"
+                    message="Topic owner cannot unsubscribe",
                 )
-            
+
             db.srem(subscribers_key, request.subscriber)
             db.hdel(offset_key, offset_field)
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="User unsubscribed successfully"
+                message="User unsubscribed successfully",
             )
-            
-        except Exception as e:
+
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
-class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServicer):
+
+class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServicer): # pylint: disable=C0301
+    """
+    Service for managing queue replication.
+    """
     def QueueReplicateCreate(self, request, context):
         try:
             db = create_redis2_connection()
@@ -352,39 +361,37 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
 
             queue_manager = MOMQueueManager(db, request.owner)
             result = queue_manager.create_queue(
                 queue_name=request.queue_name,
                 principal=False,
-                created_at=request.created_at
+                created_at=request.created_at,
             )
-            
+
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value
+                    message=result.status.value,
                 )
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Queue replicated successfully"
+                message="Queue replicated successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
-        
+
     def QueueReplicateDelete(self, request, context):
         try:
             db = create_redis2_connection()
@@ -394,37 +401,35 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
 
             queue_manager = MOMQueueManager(db, request.requester)
             result = queue_manager.delete_queue(
                 queue_name=request.queue_name,
-            )            
-            
+            )
+
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value
+                    message=result.status.value,
                 )
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Queue replicated successfully"
+                message="Queue replicated successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
-        
+
     def QueueReplicateSubscribe(self, request, context):
         try:
             db = create_redis2_connection()
@@ -434,52 +439,48 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
 
             # Obtener la clave correcta de suscriptores
             subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
             queue_key = KeyBuilder.metadata_key(request.queue_name)
-            
+
             # Verificar si la cola existe
             if not db.exists(queue_key):
-                logger.critical(f"La cola {queue_key} no existe")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Queue does not exist")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Queue does not exist"
+                    message="Queue does not exist",
                 )
-            
+
             # Verificar si el usuario ya está suscrito
             if db.sismember(subscribers_key, request.requester):
-                logger.critical(f"El usuario {request.requester} ya está suscrito a la cola {request.queue_name}")
                 context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                 context.set_details("User is already subscribed to this queue")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="User is already subscribed to this queue"
+                    message="User is already subscribed to this queue",
                 )
 
             # Suscribir al usuario
             db.sadd(subscribers_key, request.requester)
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="User subscribed successfully"
+                message="User subscribed successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
-        
+
     def QueueReplicateUnsubscribe(self, request, context):
         try:
             db = create_redis2_connection()
@@ -489,13 +490,13 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-            
+
             # Obtener la clave correcta de suscriptores
             subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
             queue_key = KeyBuilder.metadata_key(request.queue_name)
-            
+
             # Verificar si la cola existe
             if not db.exists(queue_key):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -503,7 +504,7 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Queue does not exist"
+                    message="Queue does not exist",
                 )
 
             # Verificar si el usuario está suscrito
@@ -513,24 +514,22 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="User is not subscribed to this queue"
+                    message="User is not subscribed to this queue",
                 )
 
             # Eliminar la suscripción
             db.srem(subscribers_key, request.requester)
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="User unsubscribed successfully"
+                message="User unsubscribed successfully",
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
     def QueueReplicateEnqueue(self, request, context):
@@ -543,22 +542,20 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-            
-            logger.info(f"Recibida solicitud de encolamiento para cola: {request.queue_name}")
+
             queue_manager = MOMQueueManager(db, request.requester)
-            
+
             # Verificar si la cola existe
             metadata_key = KeyBuilder.metadata_key(request.queue_name)
             if not db.exists(metadata_key):
-                logger.error(f"La cola {request.queue_name} no existe")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Queue does not exist")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Queue does not exist"
+                    message="Queue does not exist",
                 )
 
             result = queue_manager.enqueue(
@@ -566,34 +563,30 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 queue_name=request.queue_name,
                 uuid=request.uuid,
                 timestamp=request.timestamp,
-                im_replicating=True
+                im_replicating=True,
             )
 
-            logger.info(f"Resultado de la replicación en el servidor: {result}")
             if not result.success:
-                logger.error(f"Error en replicación: {result.status.value}")
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value
+                    message=result.status.value,
                 )
-            
+
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Message enqueued successfully"
+                message="Message enqueued successfully",
             )
-        
-        except Exception as e:
-            logger.error(f"Error inesperado en QueueReplicateEnqueue: {str(e)}")
+
+        except Exception as e: # pylint: disable=W0703
+            logger.exception("Error inesperado en QueueReplicateEnqueue")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
     def QueueReplicateDequeue(self, request, context):
@@ -605,22 +598,18 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed"
+                    message="Redis connection failed",
                 )
-            
-            logger.info(f"Recibida solicitud de desencolamiento para cola: {request.queue_name}")
-            queue_manager = MOMQueueManager(db, request.requester)
-            
+
             # Verificar si la cola existe
             metadata_key = KeyBuilder.metadata_key(request.queue_name)
             if not db.exists(metadata_key):
-                logger.error(f"La cola {request.queue_name} no existe")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Queue does not exist")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Queue does not exist"
+                    message="Queue does not exist",
                 )
 
             # Buscar el mensaje por UUID y desencolarlo
@@ -637,18 +626,17 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Message dequeued successfully"
+                message="Message dequeued successfully",
             )
-        
-        except Exception as e:
-            logger.error(f"Error inesperado en QueueReplicateDequeue: {str(e)}")
+
+        except Exception as e: # pylint: disable=W0703
+            logger.exception("Error inesperado en QueueReplicateDequeue")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
-                success=False,
-                status_code=StatusCode.REPLICATION_FAILED,
-                message=str(e)
+                success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
+
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -661,6 +649,7 @@ def serve():
     server.add_insecure_port("[::]:50051")
     server.start()
     server.wait_for_termination()
+
 
 if __name__ == "__main__":
     serve()

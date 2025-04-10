@@ -35,9 +35,8 @@ class MOMTopicManager:
         source_stub = get_source_client_stub()
 
         current_node_config = NODES_CONFIG[WHOAMI]
-        replica_node = current_node_config['whoreplica']
-        replica_config = NODES_CONFIG[replica_node]
-        
+        replica_node = current_node_config["whoreplica"]
+
         # Crear clientes de replicación con los stubs
         # replication_client apunta al nodo replicante
         # replication_principal apunta al nodo principal
@@ -50,13 +49,17 @@ class MOMTopicManager:
             target_node_desc=f"nodo principal ({WHOAMI})"
         )
 
-    def create_topic(self, topic_name: str, principal = True, created_at = None) -> TopicOperationResult:
+    def create_topic(
+            self, topic_name: str, principal = True, created_at = None
+                     ) -> TopicOperationResult:
         """
         Create a new topic with the specified name.
         Args:
             topic_name (str): The name of the topic to create.
-            principal (bool): Whether the topic is created by the principal node.
-            created_at (float): The timestamp of the topic creation (if is not principal).
+            principal (bool): Whether the topic is created by the 
+            principal node.
+            created_at (float): The timestamp of the topic creation 
+            (if is not principal).
 
         Returns:
             TopicOperationResult: Result of the topic creation operation.
@@ -105,11 +108,11 @@ class MOMTopicManager:
                         # Replicar creación del tópico
                         replication_op = False
                         if principal:
-                            replication_op = self.replication_client.replicate_create_topic(
+                            replication_op = self.replication_client.replicate_create_topic( # pylint: disable=C0301
                                 topic_name, self.user, created_at
                             )
 
-                        if principal and replication_op == False:
+                        if principal and replication_op is False:
                             # Descartar la transacción si la replicación falla
                             return TopicOperationResult(
                                 success=True,
@@ -136,7 +139,10 @@ class MOMTopicManager:
                 replication_result=False
             )
 
-    def publish(self, message: str, topic_name: str, timestamp = None, im_replicating = False) -> TopicOperationResult:
+    def publish(
+            self, message: str, topic_name: str,
+            timestamp = None, im_replicating = False
+            ) -> TopicOperationResult:
         """
         Publish a string message to the specified topic.
         Args:
@@ -155,24 +161,24 @@ class MOMTopicManager:
                 if not result.success:
                     result.replication_result = False
                     return result
-                
+
                 # validar si soy el mom principal para este topico
-                result = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node")
+                result = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
                 principal = bool(int(result))
-                logger.critical("Soy el mom principal para este topico: %s", principal)
+                logger.critical("Soy el mom principal para este topico: %s", principal) # pylint: disable=C0301
 
                 # Preparar mensaje
                 if principal and timestamp is None:
                     timestamp = datetime.now().timestamp()
                 else:
-                    timestamp = float(timestamp)    
+                    timestamp = float(timestamp)
                 logger.critical("timestamp: %s", timestamp)
                 full_message = {
                     "timestamp": timestamp,
                     "publisher": self.user,
                     "payload": message,
                 }
-                
+
                 pipe.multi()
                 messages_key = TopicKeyBuilder.messages_key(topic_name)
                 pipe.rpush(messages_key, json.dumps(full_message))
@@ -181,40 +187,42 @@ class MOMTopicManager:
                 pipe.execute()
 
                 # Replicar publicación del mensaje
-                # Para saber si el nodo es principal o replicante se puede mirar en metadata
-                # 
+                # Para saber si el nodo es principal o replicante se
+                # puede mirar en metadata
+
                 # 2 opciones:
-                # 1. Si el nodo es principal, se replica la publicación usando replication_client
-                # esta apunta al nodo replicante
+                # 1. Si el nodo es principal, se replica la publicación usando
+                # replication_client esta apunta al nodo replicante
                 # 2. Si es el nodo replicante, se replica la publicación usando
                 # replication_principal que apunta al nodo principal
-                # Primero se debe preguntar al zookeeper si el nodo principal o replicante esta up
-                # si está down se manda un log al zookeeper para posterior recuperación
+                # Primero se debe preguntar al zookeeper si el nodo principal
+                # o replicante esta up si está down se manda un log al
+                # zookeeper para posterior recuperación
 
                 # IMPORTANTE:
-                # se debe usar una variable que diga si esta replicando o no para evitar una
-                # recursividad infinita
+                # se debe usar una variable que diga si esta
+                # replicando o no para evitar una recursividad infinita
 
-                # TODO: preguntar al zookeeper si el nodo principal o replicante esta up
-                #zookeper_validation = ...
+                # TODO: preguntar al zookeeper si el nodo principal o
+                # replicante esta up zookeper_validation = ...
                 replication_op = False
 
-                if principal and im_replicating == False:
+                if principal and im_replicating is False:
                     logger.debug("replicando con replication_client")
-                    replication_op = self.replication_client.replicate_publish_message(
+                    replication_op = self.replication_client.replicate_publish_message( # pylint: disable=C0301
                         topic_name, self.user, message, timestamp
                     )
-                elif not principal and im_replicating == False:
+                elif not principal and im_replicating is False:
                     logger.debug("replicando con replication_principal")
-                    replication_op = self.replication_principal.replicate_publish_message(
+                    replication_op = self.replication_principal.replicate_publish_message( # pylint: disable=C0301
                         topic_name, self.user, message, timestamp
                     )
-                
+
                 # Si estoy replicando no necesito replicar de nuevo
-                if im_replicating == True:
+                if im_replicating is True:
                     replication_op = True
 
-                if (principal and replication_op == False) or (not principal and im_replicating == True and replication_op == False):
+                if (principal and replication_op is False) or (not principal and im_replicating is True and replication_op is False): # pylint: disable=C0301
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.MESSAGE_PUBLISHED,
@@ -232,13 +240,15 @@ class MOMTopicManager:
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error publishing to topic '%s'", topic_name)
             return TopicOperationResult(
-                success=False, 
-                status=MOMTopicStatus.INTERNAL_ERROR, 
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
                 details=str(e),
                 replication_result=False
             )
 
-    def consume(self, topic_name: str, self_consume: bool = False) -> TopicOperationResult:
+    def consume(
+            self, topic_name: str, self_consume: bool = False
+            ) -> TopicOperationResult:
         """
         Consume string messages from a topic based on the subscriber's current
         offset. Default is now to consume only one message at a time for
@@ -247,7 +257,8 @@ class MOMTopicManager:
         Args:
             topic_name (str): The name of the topic to consume from.
             count (int): Maximum number of messages to consume (default: 1).
-            self_consume (bool): Whether the consume is from the same user that published the message.
+            self_consume (bool): Whether the consume is 
+            from the same user that published the message.
             im_replicating (bool): Whether the consume is being replicated.
         Returns:
             TopicOperationResult: Result containing consumed string messages.
@@ -260,7 +271,7 @@ class MOMTopicManager:
                     status=MOMTopicStatus.NOT_SUBSCRIBED,
                     details="User is not subscribed to this topic"
                 )
-            
+
             lua_script = """
             local offset_key = KEYS[1]
             local messages_key = KEYS[2]
@@ -330,9 +341,9 @@ class MOMTopicManager:
             result = self.redis.eval(lua_script, 3, *keys, self.user)
 
             # Validar si soy el mom principal para este topico
-            result_principal = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node")
+            result_principal = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
 
-            # TODO: Corregir la logica para preguntar al zookeeper si el nodo principal o replicante esta up
+            # TODO: Al implementar el zookeper
             principal = bool(int(result_principal))
             replication_op = False
 
@@ -346,15 +357,15 @@ class MOMTopicManager:
                     # Si el consumo es propio
                     # Esto por que puede que aquel que lo consuma sea
                     # el que envio el mensaje
-                    if self_consume == True:
+                    if self_consume is True:
                         new_offset = int(result[1])
-                        
+
                         if principal:
-                            replication_op = self.replication_client.replicate_consume_message(
+                            replication_op = self.replication_client.replicate_consume_message( # pylint: disable=C0301
                                 topic_name, self.user, new_offset
                             )
                         elif not principal:
-                            replication_op = self.replication_principal.replicate_consume_message(
+                            replication_op = self.replication_principal.replicate_consume_message( # pylint: disable=C0301
                                 topic_name, self.user, new_offset
                             )
                         else:
@@ -364,22 +375,23 @@ class MOMTopicManager:
                         success=True,
                         status=MOMTopicStatus.NO_MESSAGES,
                         details="No new messages",
-                        replication_result=False if self_consume == False else True
+                        replication_result=False if self_consume is False else True # pylint: disable=C0301
                     )
 
                 elif status == "SELF_MESSAGE":
-                    return self.consume(topic_name, True)  # Reintentar recursivamente
+                    # Reintentar recursivamente
+                    return self.consume(topic_name, True)
 
                 elif status == "MESSAGE":
                     message_data = json.loads(result[1])
                     new_offset = int(result[2])
 
                     if principal:
-                        replication_op = self.replication_client.replicate_consume_message(
+                        replication_op = self.replication_client.replicate_consume_message( # pylint: disable=C0301
                             topic_name, self.user, new_offset
                         )
                     elif not principal:
-                        replication_op = self.replication_principal.replicate_consume_message(
+                        replication_op = self.replication_principal.replicate_consume_message( # pylint: disable=C0301
                             topic_name, self.user, new_offset
                         )
                     else:
@@ -579,14 +591,17 @@ class MOMTopicManager:
                 False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)
             )
 
-    def delete_topic(self, topic_name: str, principal = True) -> TopicOperationResult:
+    def delete_topic(
+        self, topic_name: str, principal = True
+    ) -> TopicOperationResult:
         """
         Delete the specified topic and all its messages.
         Only the owner can delete a topic.
 
         Args:
             topic_name (str): The name of the topic to delete.
-            principal (bool): Whether the topic is deleted by the principal node.
+            principal (bool): Whether the topic is deleted 
+            by the principal node.
         Returns:
             TopicOperationResult: Result of the topic deletion operation.
         """
@@ -616,13 +631,13 @@ class MOMTopicManager:
 
                 pipe.execute()  # Borrado atómico
 
-                if principal == True:
-                    replication_operation = self.replication_client.replicate_delete_topic(
-                        topic_name=topic_name, 
+                if principal is True:
+                    replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301
+                        topic_name=topic_name,
                         owner=self.user
                     )
 
-                    if replication_operation == False:
+                    if replication_operation is False:
                         return TopicOperationResult(
                             success=True,
                             status=MOMTopicStatus.TOPIC_DELETED,

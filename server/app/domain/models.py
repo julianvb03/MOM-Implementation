@@ -5,28 +5,28 @@
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict
+from typing import Optional
 
 ## Information about the replication of messages
-NODE_A_IP = os.getenv('NODE_A_IP')
-NODE_B_IP = os.getenv('NODE_B_IP')
-NODE_C_IP = os.getenv('NODE_C_IP')
-GRPC_PORT = os.getenv('GRPC_PORT')
-WHOAMI = os.getenv('WHOAMI')
+NODE_A_IP = os.getenv("NODE_A_IP")
+NODE_B_IP = os.getenv("NODE_B_IP")
+NODE_C_IP = os.getenv("NODE_C_IP")
+GRPC_PORT = os.getenv("GRPC_PORT")
+WHOAMI = os.getenv("WHOAMI")
 
 if NODE_A_IP is None or NODE_B_IP is None or NODE_C_IP is None:
-    raise ValueError("Environment variables NODE_A_IP, NODE_B_IP, and NODE_C_IP must be set")
+    raise ValueError("Environment variables NODE_A_IP, NODE_B_IP, and NODE_C_IP must be set") # pylint: disable=C0301
 if GRPC_PORT is None:
     raise ValueError("Environment variable GRPC_PORT must be set")
 if WHOAMI is None:
     raise ValueError("Environment variable WHOAMI must be set")
-if WHOAMI not in ['A', 'B', 'C']:
+if WHOAMI not in ["A", "B", "C"]:
     raise ValueError("Environment variable WHOAMI must be A, B or C")
 
 NODES_CONFIG = {
-    'A': {'ip': NODE_A_IP, 'grpc_port': GRPC_PORT, 'whoreplica': 'C'},
-    'B': {'ip': NODE_B_IP, 'grpc_port': GRPC_PORT, 'whoreplica': 'A'},
-    'C': {'ip': NODE_C_IP, 'grpc_port': GRPC_PORT, 'whoreplica': 'B'},
+    "A": {"ip": NODE_A_IP, "grpc_port": GRPC_PORT, "whoreplica": "C"},
+    "B": {"ip": NODE_B_IP, "grpc_port": GRPC_PORT, "whoreplica": "A"},
+    "C": {"ip": NODE_C_IP, "grpc_port": GRPC_PORT, "whoreplica": "B"},
 }
 
 class ReplicationStatus(Enum):
@@ -38,7 +38,6 @@ class ReplicationStatus(Enum):
     REPLICATION_NOT_REQUIRED = 2
     INVALID_REPLICATION_STATUS = 3
     REPLICATE_NODE_DISCONNECTED = 4
-    
 
 class MOMQueueStatus(Enum):
     QUEUE_CREATED = "Queue and metadata created successfully"

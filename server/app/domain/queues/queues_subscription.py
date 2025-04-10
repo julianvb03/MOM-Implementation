@@ -8,15 +8,20 @@ from app.domain.models import QueueOperationResult, MOMQueueStatus
 from app.domain.logger_config import logger
 from app.domain.utils import KeyBuilder
 from app.domain.queues.queues_validator import QueueValidator
-from app.domain.queue_replication_clients import get_source_queue_client, get_target_queue_client
+from app.domain.queue_replication_clients import (
+    get_source_queue_client,
+    get_target_queue_client,
+)
 from app.domain.models import NODES_CONFIG, WHOAMI
 from app.domain.queues.queues_replication import QueueReplicationClient
+
 
 class SubscriptionService:
     """
     This class handles the subscription management for message queues,
     including subscribing and unsubscribing users to/from queues.
     """
+
     def __init__(self, redis, user: str):
         self.redis = redis
         self.user = user
@@ -27,19 +32,16 @@ class SubscriptionService:
         source_stub = get_source_queue_client()
 
         current_node_config = NODES_CONFIG[WHOAMI]
-        replica_node = current_node_config['whoreplica']
-        replica_config = NODES_CONFIG[replica_node]
-        
+        replica_node = current_node_config["whoreplica"]
+
         # Crear clientes de replicación con los stubs
         # replication_client apunta al nodo replicante
         # replication_principal apunta al nodo principal
         self.replication_client = QueueReplicationClient(
-        stub=replica_stub,
-        target_node_desc=f"nodo réplica ({replica_node})"
+            stub=replica_stub, target_node_desc=f"nodo réplica ({replica_node})"
         )
         self.replication_principal = QueueReplicationClient(
-            stub=source_stub,
-            target_node_desc=f"nodo principal ({WHOAMI})"
+            stub=source_stub, target_node_desc=f"nodo principal ({WHOAMI})"
         )
 
     def subscribe(self, queue_name: str) -> QueueOperationResult:
@@ -73,25 +75,29 @@ class SubscriptionService:
             replication_op = False
             if not principal:
                 # Si no soy principal, replico al nodo original
-                replication_op = self.replication_principal.subscribe(queue_name, self.user)
+                replication_op = self.replication_principal.subscribe(
+                    queue_name, self.user
+                )
             else:
                 # Si soy principal, replico a quien me replica a mí
-                replication_op = self.replication_client.subscribe(queue_name, self.user)
+                replication_op = self.replication_client.subscribe(
+                    queue_name, self.user
+                )
 
             return QueueOperationResult(
                 success=True,
                 status=MOMQueueStatus.SUCCES_OPERATION,
                 details=f"User {self.user} subscribed to {queue_name}",
-                replication_result=replication_op
+                replication_result=replication_op,
             )
 
-        except Exception as e: # pylint: disable=W0718
-            logger.exception("Error subscribing to queue '%s'",queue_name)
+        except Exception as e:  # pylint: disable=W0718
+            logger.exception("Error subscribing to queue '%s'", queue_name)
             return QueueOperationResult(
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
                 details=str(e),
-                replication_result=False
+                replication_result=False,
             )
 
     def unsubscribe(self, queue_name: str) -> QueueOperationResult:
@@ -111,9 +117,7 @@ class SubscriptionService:
             result = self.validator.validate_user_is_owner(queue_name)
             if result.success is True:
                 result.success = False
-                result.details = (
-                    "User is the owner of the queue and cannot unsubscribe"
-                )
+                result.details = "User is the owner of the queue and cannot unsubscribe" # pylint: disable=C0301
                 return result
 
             result = self.validator.validate_user_subscribed(queue_name)
@@ -132,23 +136,27 @@ class SubscriptionService:
             replication_op = False
             if not principal:
                 # Si no soy principal, replico al nodo original
-                replication_op = self.replication_principal.unsubscribe(queue_name, self.user)
+                replication_op = self.replication_principal.unsubscribe(
+                    queue_name, self.user
+                )
             else:
                 # Si soy principal, replico a quien me replica a mí
-                replication_op = self.replication_client.unsubscribe(queue_name, self.user)
+                replication_op = self.replication_client.unsubscribe(
+                    queue_name, self.user
+                )
 
             return QueueOperationResult(
                 success=True,
                 status=MOMQueueStatus.SUCCES_OPERATION,
                 details=f"User {self.user} unsubscribed from {queue_name}",
-                replication_result=replication_op
+                replication_result=replication_op,
             )
 
-        except Exception as e: # pylint: disable=W0718
-            logger.exception("Error unsubscribing from queue '%s'",queue_name)
+        except Exception as e:  # pylint: disable=W0718
+            logger.exception("Error unsubscribing from queue '%s'", queue_name)
             return QueueOperationResult(
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
                 details=str(e),
-                replication_result=False
+                replication_result=False,
             )

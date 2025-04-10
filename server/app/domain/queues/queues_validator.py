@@ -1,5 +1,5 @@
 """
-This module contains the QueueValidator class, which is responsible 
+This module contains the QueueValidator class, which is responsible
 for validatin queue operations in a Redis-based message queue system,
 isolating the validation logic for better maintainability and readability.
 """
@@ -12,6 +12,7 @@ class QueueValidator:
     """
     This class handles the validation of queue operations in a Redis-based
     """
+
     def __init__(self, redis, user):
         self.redis = redis
         self.user = user

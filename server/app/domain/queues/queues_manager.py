@@ -36,9 +36,8 @@ class MOMQueueManager:
         source_stub = get_source_queue_client()
 
         current_node_config = NODES_CONFIG[WHOAMI]
-        replica_node = current_node_config['whoreplica']
-        replica_config = NODES_CONFIG[replica_node]
-        
+        replica_node = current_node_config["whoreplica"]
+
         # Crear clientes de replicación con los stubs
         # replication_client apunta al nodo replicante
         # replication_principal apunta al nodo principal
@@ -52,7 +51,8 @@ class MOMQueueManager:
         )
 
     def create_queue(
-        self, queue_name: str, message_limit: int = 1000, principal: bool = True, created_at: str = None
+        self, queue_name: str, message_limit: int = 1000,
+        principal: bool = True, created_at: str = None
     ) -> QueueOperationResult:
         """
         Create a new queue with the specified name and message limit.
@@ -79,7 +79,7 @@ class MOMQueueManager:
                 result.replication_result = False
                 return result
 
-            if created_at == None:
+            if created_at is None:
                 created_at = datetime.now().timestamp()
 
             metadata = {
@@ -96,7 +96,7 @@ class MOMQueueManager:
             if result.success is False:
                 self.redis.delete(metadata_key, queue_key)
                 return result
-            
+
             # Replication
             if principal:
                 result = self.replication_client.create_queue(
@@ -126,7 +126,9 @@ class MOMQueueManager:
                 False, MOMQueueStatus.INTERNAL_ERROR, str(e)
             )
 
-    def enqueue(self, message: str, queue_name: str, uuid: str = None, timestamp = None, im_replicating = False) -> QueueOperationResult:
+    def enqueue(self, message: str, queue_name: str,
+                uuid: str = None, timestamp = None,
+                im_replicating = False) -> QueueOperationResult:
         """
         Enqueue a message to the specified queue.
         Args:
@@ -153,9 +155,7 @@ class MOMQueueManager:
             # if result.success is False:
             #     return result
 
-            principal = bool(int(self.redis.hget(metadata_key, "original_node")))
-            logger.critical(f"im_replicating: {im_replicating}")
-            logger.critical(f"Principal: {self.redis.hget(metadata_key, "original_node")}")
+            principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
             if principal and uuid is None:
                 uuid = str(uuid_lib.uuid4())
             if principal and timestamp is None:
@@ -188,7 +188,6 @@ class MOMQueueManager:
                         uuid=uuid,
                         timestamp=timestamp
                     )
-                logger.info(f"Resultado de la replicación: {replication_result}")
 
             return QueueOperationResult(
                 success=True,
@@ -196,10 +195,10 @@ class MOMQueueManager:
                 details="Message enqueued successfully",
                 replication_result=replication_result
             )
-        except Exception as e:
-            logger.exception(f"Error enqueueing message to '{queue_name}'")
+        except Exception as e: # pylint: disable=W0718
+            logger.error("Error enqueueing message to '%s'", queue_name)
             return QueueOperationResult(
-                success=False, 
+                success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
                 details=str(e),
                 replication_result=False
@@ -231,8 +230,8 @@ class MOMQueueManager:
                 result.replication_result = False
                 return result
 
-            principal = bool(int(self.redis.hget(metadata_key, "original_node")))
-            
+            principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
+
             if uuid is not None:
                 # Caso con UUID específico
                 messages = self.redis.lrange(queue_key, 0, -1)
@@ -244,7 +243,7 @@ class MOMQueueManager:
                         # Eliminar el mensaje específico
                         self.redis.lrem(queue_key, 1, msg)
                         break
-                
+
                 if not message_to_dequeue:
                     return QueueOperationResult(
                         success=False,
@@ -258,14 +257,14 @@ class MOMQueueManager:
                 if not message_json:
                     return QueueOperationResult(
                         success=True,
-                        status=MOMQueueStatus.EMPTY_QUEUE, 
+                        status=MOMQueueStatus.EMPTY_QUEUE,
                         details="",
                         replication_result=False
                     )
                 message_to_dequeue = json.loads(message_json)
 
             self.redis.hincrby(metadata_key, "total_messages", -1)
-            
+
             # Replicación
             replication_result = True
             if not im_replicating:
@@ -350,7 +349,7 @@ class MOMQueueManager:
             if result.success is False:
                 return result
 
-            principal = bool(int(self.redis.hget(metadata_key, "original_node")))
+            principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
             self.redis.delete(queue_key, metadata_key, subscribers_key)
             if principal:
                 result = self.replication_client.delete_queue(
@@ -361,7 +360,7 @@ class MOMQueueManager:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.INTERNAL_ERROR,
-                        details="Queue deleted successfully, but replication failed",
+                        details="Queue deleted successfully, but replication failed", # pylint: disable=C0301
                         replication_result=False
                     )
 
