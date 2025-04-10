@@ -269,7 +269,8 @@ class MOMTopicManager:
                 return TopicOperationResult(
                     success=False,
                     status=MOMTopicStatus.NOT_SUBSCRIBED,
-                    details="User is not subscribed to this topic"
+                    details="User is not subscribed to this topic",
+                    replication_result=False
                 )
 
             lua_script = """
@@ -454,6 +455,7 @@ class MOMTopicManager:
             # Validar existencia del tópico
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
+                result.success = False
                 return 0
 
             # Obtener claves necesarias
@@ -552,6 +554,7 @@ class MOMTopicManager:
         try:
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
+                result.success = False
                 return result
 
             metadata_key = TopicKeyBuilder.metadata_key(topic_name)
@@ -578,9 +581,10 @@ class MOMTopicManager:
             }
 
             return TopicOperationResult(
-                True,
-                MOMTopicStatus.TOPIC_EXISTS,
-                topic_info,
+                success=True,
+                status=MOMTopicStatus.TOPIC_EXISTS,
+                details=topic_info,
+                replication_result=False
             )
 
         except Exception as e:  # pylint: disable=W0718
@@ -588,7 +592,10 @@ class MOMTopicManager:
                 "Error fetching topic info for '%s'", topic_name
             )  # pylint: disable=C0301
             return TopicOperationResult(
-                False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)
+                success=False,
+                status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                details=str(e),
+                replication_result=False
             )
 
     def delete_topic(
@@ -610,14 +617,14 @@ class MOMTopicManager:
                 # Validar existencia y ownership
                 result = self.validator.validate_topic_exists(topic_name)
                 if not result.success:
+                    result.success = False
+                    result.replication_result = False
                     return result
                 result = self.validator.validate_user_is_owner(topic_name)
                 if not result.success:
-                    return TopicOperationResult(
-                        False,
-                        MOMTopicStatus.INVALID_ARGUMENTS,
-                        "Only the topic owner can delete it",
-                        )
+                    result.success = False
+                    result.replication_result = False
+                    return result
 
                 # Eliminar en transacción
                 pipe.multi()

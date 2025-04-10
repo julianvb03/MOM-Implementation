@@ -110,6 +110,8 @@ class TopicSubscriptionService:
         try:
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
+                result.success = False
+                result.replication_result = False
                 return result
 
             result = self.validator.validate_user_is_owner(topic_name)

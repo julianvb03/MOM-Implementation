@@ -76,6 +76,7 @@ class MOMQueueManager:
 
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is True:
+                result.success = False
                 result.replication_result = False
                 return result
 
@@ -145,7 +146,7 @@ class MOMQueueManager:
 
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
-                print(f"Result validate_queue_exists: {result}")
+                result.success = False
                 result.replication_result = False
                 return result
 

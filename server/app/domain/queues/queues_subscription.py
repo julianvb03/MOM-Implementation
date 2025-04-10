@@ -60,6 +60,7 @@ class SubscriptionService:
 
             result = self.validator.validate_user_subscribed(queue_name)
             if result.success is True:
+                result.success = False
                 result.replication_result = False
                 return result
 
