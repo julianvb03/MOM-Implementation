@@ -32,8 +32,8 @@ class MOMQueueManager:
         self.validator = QueueValidator(self.redis, user)
 
         # Obtener los stubs de replicación
-        replica_stub = get_target_queue_client()
-        source_stub = get_source_queue_client()
+        replica_stub = get_source_queue_client()
+        source_stub = get_target_queue_client()
 
         current_node_config = NODES_CONFIG[WHOAMI]
         replica_node = current_node_config["whoreplica"]

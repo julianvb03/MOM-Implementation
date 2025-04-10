@@ -31,8 +31,8 @@ class MOMTopicManager:
         self.validator = TopicValidator(self.redis, user)
 
         # Obtener los stubs de replicación
-        replica_stub = get_replica_client_stub()
-        source_stub = get_source_client_stub()
+        replica_stub = get_source_client_stub()
+        source_stub = get_replica_client_stub()
 
         current_node_config = NODES_CONFIG[WHOAMI]
         replica_node = current_node_config["whoreplica"]
