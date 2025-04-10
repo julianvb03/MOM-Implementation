@@ -13,7 +13,9 @@ from app.domain.logger_config import logger
 from app.domain.utils import TopicKeyBuilder
 from app.domain.topics.topics_subscription import TopicSubscriptionService
 from app.domain.topics.topics_validator import TopicValidator
-
+from app.domain.topics.topics_replication import TopicReplicationClient
+from app.domain.replication_clients import get_replica_client_stub, get_source_client_stub
+from app.domain.models import NODES_CONFIG, WHOAMI
 
 class MOMTopicManager:
     """
@@ -28,11 +30,37 @@ class MOMTopicManager:
         self.subscriptions = TopicSubscriptionService(self.redis, self.user)
         self.validator = TopicValidator(self.redis, user)
 
-    def create_topic(self, topic_name: str) -> TopicOperationResult:
+        # Obtener los stubs de replicación
+        replica_stub = get_replica_client_stub()
+        source_stub = get_source_client_stub()
+
+        current_node_config = NODES_CONFIG[WHOAMI]
+        replica_node = current_node_config["whoreplica"]
+
+        # Crear clientes de replicación con los stubs
+        # replication_client apunta al nodo replicante
+        # replication_principal apunta al nodo principal
+        self.replication_client = TopicReplicationClient(
+        stub=replica_stub,
+        target_node_desc=f"nodo réplica ({replica_node})"
+        )
+        self.replication_principal = TopicReplicationClient(
+            stub=source_stub,
+            target_node_desc=f"nodo principal ({WHOAMI})"
+        )
+
+    def create_topic(
+            self, topic_name: str, principal = True, created_at = None
+                     ) -> TopicOperationResult:
         """
         Create a new topic with the specified name.
         Args:
             topic_name (str): The name of the topic to create.
+            principal (bool): Whether the topic is created by the 
+            principal node.
+            created_at (float): The timestamp of the topic creation 
+            (if is not principal).
+
         Returns:
             TopicOperationResult: Result of the topic creation operation.
         """
@@ -52,13 +80,17 @@ class MOMTopicManager:
                         # Inicia transacción
                         pipe.multi()
 
+                        if principal and created_at is None:
+                            created_at = datetime.now().timestamp()
+
                         # Crear metadata
                         metadata = {
                             "name": topic_name,
                             "owner": self.user,
-                            "created_at": datetime.now().timestamp(),
+                            "created_at": created_at,
                             "message_count": 0,
                             "processed_count": 0,
+                            "original_node": int(principal)
                         }
                         pipe.hset(metadata_key, mapping=metadata)
 
@@ -72,24 +104,53 @@ class MOMTopicManager:
                         pipe.hsetnx(offset_key, offset_field, 0)
 
                         pipe.execute()  # Ejecuta todo atómicamente
+
+                        # Replicar creación del tópico
+                        replication_op = False
+                        if principal:
+                            replication_op = self.replication_client.replicate_create_topic( # pylint: disable=C0301
+                                topic_name, self.user, created_at
+                            )
+
+                        if principal and replication_op is False:
+                            # Descartar la transacción si la replicación falla
+                            return TopicOperationResult(
+                                success=True,
+                                status=MOMTopicStatus.TOPIC_CREATED,
+                                details="Topic not replicated",
+                                replication_result=False
+                            )
+
                         return TopicOperationResult(
-                            True,
-                            MOMTopicStatus.TOPIC_CREATED,
-                            f"Topic {topic_name} created successfully",
+                            success=True,
+                            status=MOMTopicStatus.TOPIC_CREATED,
+                            details=f"Topic {topic_name} created successfully",
+                            replication_result=replication_op
                         )
                     except redis.WatchError:
                         # Reintentar si otra transacción modificó metadata_key
                         continue
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error creating topic '%s'", topic_name)
-            return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                details=str(e),
+                replication_result=False
+            )
 
-    def publish(self, message: str, topic_name: str) -> TopicOperationResult:
+    def publish(
+            self, message: str, topic_name: str,
+            timestamp = None, im_replicating = False
+            ) -> TopicOperationResult:
         """
         Publish a string message to the specified topic.
         Args:
             message (str): The string message to publish.
             topic_name (str): The name of the topic to publish to.
+            timestamp (float): The timestamp of the message.
+            im_replicating (bool): Whether the publish is being replicated.
+
         Returns:
             TopicOperationResult: Result of the publish operation.
         """
@@ -98,33 +159,96 @@ class MOMTopicManager:
                 # Validar existencia del tópico
                 result = self.validator.validate_topic_exists(topic_name)
                 if not result.success:
+                    result.replication_result = False
                     return result
 
+                # validar si soy el mom principal para este topico
+                result = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
+                principal = bool(int(result))
+                logger.critical("Soy el mom principal para este topico: %s", principal) # pylint: disable=C0301
+
                 # Preparar mensaje
+                if principal and timestamp is None:
+                    timestamp = datetime.now().timestamp()
+                else:
+                    timestamp = float(timestamp)
+                logger.critical("timestamp: %s", timestamp)
                 full_message = {
-                    "timestamp": datetime.now().timestamp(),
+                    "timestamp": timestamp,
                     "publisher": self.user,
                     "payload": message,
                 }
 
-                # Ejecutar en transacción
                 pipe.multi()
                 messages_key = TopicKeyBuilder.messages_key(topic_name)
                 pipe.rpush(messages_key, json.dumps(full_message))
                 metadata_key = TopicKeyBuilder.metadata_key(topic_name)
                 pipe.hincrby(metadata_key, "message_count", 1)
-                pipe.execute()  # Atomicidad garantizada
+                pipe.execute()
+
+                # Replicar publicación del mensaje
+                # Para saber si el nodo es principal o replicante se
+                # puede mirar en metadata
+
+                # 2 opciones:
+                # 1. Si el nodo es principal, se replica la publicación usando
+                # replication_client esta apunta al nodo replicante
+                # 2. Si es el nodo replicante, se replica la publicación usando
+                # replication_principal que apunta al nodo principal
+                # Primero se debe preguntar al zookeeper si el nodo principal
+                # o replicante esta up si está down se manda un log al
+                # zookeeper para posterior recuperación
+
+                # IMPORTANTE:
+                # se debe usar una variable que diga si esta
+                # replicando o no para evitar una recursividad infinita
+
+                # TODO: preguntar al zookeeper si el nodo principal o
+                # replicante esta up zookeper_validation = ...
+                replication_op = False
+
+                if principal and im_replicating is False:
+                    logger.debug("replicando con replication_client")
+                    replication_op = self.replication_client.replicate_publish_message( # pylint: disable=C0301
+                        topic_name, self.user, message, timestamp
+                    )
+                elif not principal and im_replicating is False:
+                    logger.debug("replicando con replication_principal")
+                    replication_op = self.replication_principal.replicate_publish_message( # pylint: disable=C0301
+                        topic_name, self.user, message, timestamp
+                    )
+
+                # Si estoy replicando no necesito replicar de nuevo
+                if im_replicating is True:
+                    replication_op = True
+
+                if (principal and replication_op is False) or (not principal and im_replicating is True and replication_op is False): # pylint: disable=C0301
+                    return TopicOperationResult(
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_PUBLISHED,
+                        details="Message not replicated",
+                        replication_result=False
+                    )
+
 
                 return TopicOperationResult(
-                    True,
-                    MOMTopicStatus.MESSAGE_PUBLISHED,
-                    f"Message published to topic {topic_name}",
+                    success=True,
+                    status=MOMTopicStatus.MESSAGE_PUBLISHED,
+                    details=f"Message published to topic {topic_name}",
+                    replication_result=replication_op
                 )
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error publishing to topic '%s'", topic_name)
-            return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details=str(e),
+                replication_result=False
+            )
 
-    def consume(self, topic_name: str) -> TopicOperationResult:
+    def consume(
+            self, topic_name: str, self_consume: bool = False
+            ) -> TopicOperationResult:
         """
         Consume string messages from a topic based on the subscriber's current
         offset. Default is now to consume only one message at a time for
@@ -133,11 +257,22 @@ class MOMTopicManager:
         Args:
             topic_name (str): The name of the topic to consume from.
             count (int): Maximum number of messages to consume (default: 1).
-
+            self_consume (bool): Whether the consume is 
+            from the same user that published the message.
+            im_replicating (bool): Whether the consume is being replicated.
         Returns:
             TopicOperationResult: Result containing consumed string messages.
         """
         try:
+            subscribers_key = TopicKeyBuilder.subscribers_key(topic_name)
+            if not self.redis.sismember(subscribers_key, self.user):
+                return TopicOperationResult(
+                    success=False,
+                    status=MOMTopicStatus.NOT_SUBSCRIBED,
+                    details="User is not subscribed to this topic",
+                    replication_result=False
+                )
+
             lua_script = """
             local offset_key = KEYS[1]
             local messages_key = KEYS[2]
@@ -165,13 +300,13 @@ class MOMTopicManager:
             -- Verificar si hay mensajes
             local total_messages = redis.call('LLEN', messages_key)
             if real_offset >= total_messages then
-                return {"NO_MESSAGES"}
+                return {"NO_MESSAGES", tostring(current_offset)}
             end
 
             -- Leer mensaje
             local raw_message = redis.call('LINDEX', messages_key, real_offset)
             if not raw_message then
-                return {"NO_MESSAGES"}
+                return {"NO_MESSAGES", tostring(current_offset)}
             end
 
             -- Decodificar mensaje
@@ -182,18 +317,20 @@ class MOMTopicManager:
 
             -- Saltar mensajes propios
             if message_data.publisher == user then
-                redis.call('HSET', offset_key, offset_field, current_offset + 1)
-                local new_real_offset = (current_offset + 1) - total_deleted
+                local new_offset = current_offset + 1
+                redis.call('HSET', offset_key, offset_field, new_offset)
+                local new_real_offset = new_offset - total_deleted
                 if new_real_offset >= redis.call('LLEN', messages_key) then
-                    return {"NO_MESSAGES"}
+                    return {"NO_MESSAGES", tostring(new_offset)}
                 else
-                    return {"SELF_MESSAGE"}
+                    return {"SELF_MESSAGE", tostring(new_offset)}
                 end
             end
 
             -- Actualizar offset y retornar mensaje
-            redis.call('HSET', offset_key, offset_field, current_offset + 1)
-            return {"MESSAGE", raw_message}
+            local new_offset = current_offset + 1
+            redis.call('HSET', offset_key, offset_field, new_offset)
+            return {"MESSAGE", raw_message, tostring(new_offset)}
             """
 
             keys = [
@@ -204,34 +341,77 @@ class MOMTopicManager:
 
             result = self.redis.eval(lua_script, 3, *keys, self.user)
 
+            # Validar si soy el mom principal para este topico
+            result_principal = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
+
+            # TODO: Al implementar el zookeper
+            principal = bool(int(result_principal))
+            replication_op = False
+
             # Manejo de resultados
             if isinstance(result, list):
                 status = result[0].decode() if isinstance(result[0], bytes) else result[0] # pylint: disable=C0301
 
                 if status == "NO_MESSAGES":
+
+                    # Aunque no hay mensajes, se replica el offset
+                    # Si el consumo es propio
+                    # Esto por que puede que aquel que lo consuma sea
+                    # el que envio el mensaje
+                    if self_consume is True:
+                        new_offset = int(result[1])
+
+                        if principal:
+                            replication_op = self.replication_client.replicate_consume_message( # pylint: disable=C0301
+                                topic_name, self.user, new_offset
+                            )
+                        elif not principal:
+                            replication_op = self.replication_principal.replicate_consume_message( # pylint: disable=C0301
+                                topic_name, self.user, new_offset
+                            )
+                        else:
+                            replication_op = False
+
                     return TopicOperationResult(
-                        True,
-                        MOMTopicStatus.NO_MESSAGES,
-                        "No new messages"
+                        success=True,
+                        status=MOMTopicStatus.NO_MESSAGES,
+                        details="No new messages",
+                        replication_result=False if self_consume is False else True # pylint: disable=C0301
                     )
 
                 elif status == "SELF_MESSAGE":
-                    return self.consume(topic_name)  # Reintentar recursivamente
+                    # Reintentar recursivamente
+                    return self.consume(topic_name, True)
 
                 elif status == "MESSAGE":
                     message_data = json.loads(result[1])
+                    new_offset = int(result[2])
+
+                    if principal:
+                        replication_op = self.replication_client.replicate_consume_message( # pylint: disable=C0301
+                            topic_name, self.user, new_offset
+                        )
+                    elif not principal:
+                        replication_op = self.replication_principal.replicate_consume_message( # pylint: disable=C0301
+                            topic_name, self.user, new_offset
+                        )
+                    else:
+                        replication_op = False
+
                     return TopicOperationResult(
-                        True,
-                        MOMTopicStatus.MESSAGE_CONSUMED,
-                        message_data.get("payload", "")
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_CONSUMED,
+                        details=message_data.get("payload", ""),
+                        replication_result=replication_op
                     )
 
                 elif status == "ERROR":
                     error_details = result[1].decode() if len(result) > 1 else "Unknown error" # pylint: disable=C0301
                     return TopicOperationResult(
-                        False,
-                        MOMTopicStatus.INTERNAL_ERROR,
-                        error_details
+                        success=False,
+                        status=MOMTopicStatus.INTERNAL_ERROR,
+                        details=error_details,
+                        replication_result=False
                     )
 
             return TopicOperationResult(
@@ -275,6 +455,7 @@ class MOMTopicManager:
             # Validar existencia del tópico
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
+                result.success = False
                 return 0
 
             # Obtener claves necesarias
@@ -373,6 +554,7 @@ class MOMTopicManager:
         try:
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
+                result.success = False
                 return result
 
             metadata_key = TopicKeyBuilder.metadata_key(topic_name)
@@ -399,9 +581,10 @@ class MOMTopicManager:
             }
 
             return TopicOperationResult(
-                True,
-                MOMTopicStatus.TOPIC_EXISTS,
-                topic_info,
+                success=True,
+                status=MOMTopicStatus.TOPIC_EXISTS,
+                details=topic_info,
+                replication_result=False
             )
 
         except Exception as e:  # pylint: disable=W0718
@@ -409,16 +592,23 @@ class MOMTopicManager:
                 "Error fetching topic info for '%s'", topic_name
             )  # pylint: disable=C0301
             return TopicOperationResult(
-                False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)
+                success=False,
+                status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                details=str(e),
+                replication_result=False
             )
 
-    def delete_topic(self, topic_name: str) -> TopicOperationResult:
+    def delete_topic(
+        self, topic_name: str, principal = True
+    ) -> TopicOperationResult:
         """
         Delete the specified topic and all its messages.
         Only the owner can delete a topic.
 
         Args:
             topic_name (str): The name of the topic to delete.
+            principal (bool): Whether the topic is deleted 
+            by the principal node.
         Returns:
             TopicOperationResult: Result of the topic deletion operation.
         """
@@ -427,14 +617,14 @@ class MOMTopicManager:
                 # Validar existencia y ownership
                 result = self.validator.validate_topic_exists(topic_name)
                 if not result.success:
+                    result.success = False
+                    result.replication_result = False
                     return result
                 result = self.validator.validate_user_is_owner(topic_name)
                 if not result.success:
-                    return TopicOperationResult(
-                        False,
-                        MOMTopicStatus.INVALID_ARGUMENTS,
-                        "Only the topic owner can delete it",
-                        )
+                    result.success = False
+                    result.replication_result = False
+                    return result
 
                 # Eliminar en transacción
                 pipe.multi()
@@ -445,16 +635,37 @@ class MOMTopicManager:
                     TopicKeyBuilder.subscriber_offsets_key(topic_name),
                 ]
                 pipe.delete(*keys)
+
                 pipe.execute()  # Borrado atómico
 
+                if principal is True:
+                    replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301
+                        topic_name=topic_name,
+                        owner=self.user
+                    )
+
+                    if replication_operation is False:
+                        return TopicOperationResult(
+                            success=True,
+                            status=MOMTopicStatus.TOPIC_DELETED,
+                            details="Topic not replicated",
+                            replication_result=False
+                        )
+
                 return TopicOperationResult(
-                    True,
-                    MOMTopicStatus.TOPIC_DELETED,
-                    f"Topic {topic_name} deleted successfully",
+                    success=True,
+                    status=MOMTopicStatus.TOPIC_DELETED,
+                    details="Topic deleted successfully",
+                    replication_result=True
                 )
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error deleting topic '%s'", topic_name)
-            return TopicOperationResult(False, MOMTopicStatus.TOPIC_NOT_EXIST, str(e)) # pylint: disable=C0301
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details=str(e),
+                replication_result=False
+            )
 
     def get_user_topics(self) -> TopicOperationResult:
         """

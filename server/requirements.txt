@@ -8,3 +8,5 @@ httpx==0.28.1
 passlib==1.7.4
 redis==5.2.1
 dependency-injector==4.46.0
+grpcio==1.71.0
+grpcio-tools==1.71.0

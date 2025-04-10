@@ -1,5 +1,5 @@
 """
-Utils for MOMQueue
+Utils for MOM
 """
 
 from app.domain.models import QueueOperationResult, MOMQueueStatus
