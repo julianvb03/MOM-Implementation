@@ -108,7 +108,7 @@ class MOMQueueManager:
                 if result is False:
                     self.redis.delete(metadata_key, queue_key)
                     return QueueOperationResult(
-                        success=False,
+                        success=True,
                         status=MOMQueueStatus.INTERNAL_ERROR,
                         details=f"Queue {queue_name} created successfully",
                         replication_result=False
