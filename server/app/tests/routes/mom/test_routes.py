@@ -221,7 +221,7 @@ def test_subscribe_queue_topic_already_suscribed():
     assert response.status_code == 200
     data = response.json()
     assert "User is subscribed" == data["message"]
-    assert True == data["success"]
+    assert False == data["success"]
     
     response = client.post(
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
@@ -601,9 +601,219 @@ def test_send_unauthorized():
     assert data["detail"] == "Not authenticated"
 
 
-def test_receive():
+def test_receive_topic():
     """
     Test the receive endpoint
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Topic topic-example created successfully" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User noadmin subscribed to topic topic-example" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message published to topic topic-example" == data["message"]
+    assert True == data["success"]
+
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert "Hello, World!" == data["message"]
+
+
+def test_receive_queue():
+    """
+    Test the receive endpoint
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Queue queue-example created successfully" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User noadmin subscribed to queue-example" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message enqueued successfully" == data["message"]
+    assert True == data["success"]
+
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert "Hello, World!" == data["message"]
+
+
+def test_receive_topic_same_publish():
+    """
+    Test the receive endpoint with the same publish user
     """
     response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
         "username": DEFAULT_USER_NAME,
@@ -644,6 +854,108 @@ def test_receive():
     assert "Message published to topic topic-example" == data["message"]
     assert True == data["success"]
 
+    # Receive test
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert None == data["message"]
+
+
+def test_receive_queue_same_publish():
+    """
+    Test the receive endpoint with the same publish user
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Queue queue-example created successfully" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message enqueued successfully" == data["message"]
+    assert True == data["success"]
+
+    # Receive test
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert None == data["message"]
+
+
+def test_receive_topic_empty():
+    """
+    Test the receive endpoint with queue empty
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Topic topic-example created successfully" == data["message"]
+    assert True == data["success"]
+
     response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
         "username": "noadmin",
         "password": "123"
@@ -666,10 +978,46 @@ def test_receive():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "User noadmin subscribed to topic-example" == data["message"]
+    assert "User noadmin subscribed to topic topic-example" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message published to topic topic-example" == data["message"]
     assert True == data["success"]
 
     # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
     response = client.post(
         f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
         headers=headers,
@@ -680,7 +1028,340 @@ def test_receive():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "'message' received by noadmin from Queue queue-example successfully." == data
+    assert True == data["success"]
+    assert "Hello, World!" == data["message"]
+    
+    # Receive test again
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert None == data["message"]
+
+
+def test_receive_queue_empty():
+    """
+    Test the receive endpoint with queue empty
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Queue queue-example created successfully" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User noadmin subscribed to queue-example" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message enqueued successfully" == data["message"]
+    assert True == data["success"]
+
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert "Hello, World!" == data["message"]
+    
+    # Receive test again
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert True == data["success"]
+    assert None == data["message"]
+
+
+def test_receive_topic_not_suscribed():
+    """
+    Test the receive endpoint with queue topic not suscribed
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Topic topic-example created successfully" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message published to topic topic-example" == data["message"]
+    assert True == data["success"]
+
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert False == data["success"]
+    assert "User is not subscribed to topic topic-example" == data["message"]
+
+
+def test_receive_queue_not_suscribed():
+    """
+    Test the receive endpoint with queue topic not suscribed
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Queue queue-example created successfully" == data["message"]
+    assert True == data["success"]
+
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/send",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue",
+            "message": "Hello, World!"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Message enqueued successfully" == data["message"]
+    assert True == data["success"]
+
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert False == data["success"]
+    assert "User is not subscribed" == data["message"]
+
+
+
+def test_receive_queue_not_found():
+    """
+    Test the receive endpoint with queue topic not created
+    """
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "queue-example",
+            "type": "queue"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert False == data["success"]
+    assert "Queue does not exist" == data["message"]
+
+
+def test_receive_topic_not_found():
+    """
+    Test the receive endpoint with queue topic not created
+    """
+    # Receive test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/receive",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert False == data["success"]
+    assert "Topic topic-example does not exist" == data["message"]
 
 
 def test_receive_unauthorized():

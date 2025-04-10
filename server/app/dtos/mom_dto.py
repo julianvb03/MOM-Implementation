@@ -34,7 +34,7 @@ class QueueTopicResponse(BaseModel):
         description="Success status of the action",
         json_schema_extra={"example": True}
     )
-    message: str = Field(
+    message: str | None = Field(
         ...,
         description="Message receive from the topic or queue," \
         + " or success/error messages",
