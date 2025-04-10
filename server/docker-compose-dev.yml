@@ -13,6 +13,27 @@ services:
       - redis-network
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
 
+  redis_users:
+    image: redis:alpine
+    container_name: redis_users
+    restart: always
+    ports:
+      - "8001:6379"
+    volumes:
+      - redis_users_data:/data
+    networks:
+      - redis-network
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_USERS_PASSWORD}
+    
+  zookeeper:
+    image: zookeeper:3.7
+    container_name: zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    networks:
+      - redis-network
+
   mom-server:
     build:
       context: .
@@ -20,16 +41,19 @@ services:
     container_name: mom-server
     restart: always
     ports:
-      - "8080:8000"
+      - "8000:8000"
     env_file:
       - .env
     depends_on:
       - redis
+      - zookeeper
     networks:
       - redis-network
 
 volumes:
   redis_data:
+    driver: local
+  redis_users_data:
     driver: local
 
 networks:
