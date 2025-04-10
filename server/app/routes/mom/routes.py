@@ -173,7 +173,6 @@ def unsubscribe(
         success: bool = False
         message: str = ""
         details: str = ""
-        
 
         if queue_topic.type == MomType.QUEUE:
             manager = MOMQueueManager(
@@ -195,7 +194,7 @@ def unsubscribe(
             success = result.success
             message = result.details
             details = result.status.value
-            
+
         logger.info(details)
         return QueueTopicResponse(
             success=success,
@@ -222,7 +221,7 @@ def unsubscribe(
             status_code=status.HTTP_200_OK,
             summary="Endpoint for a user to send" \
                 + "a message to a topic or queue.",
-            response_model=str,
+            response_model=QueueTopicResponse,
             responses={
                 500: {
                     "model": ResponseError, 
@@ -245,7 +244,10 @@ def unsubscribe(
 def send_message(
     request: Request,
     message_queue_topic: MessageQueueTopic,
-    auth: dict = Depends(auth_handler.authenticate)
+    auth: dict = Depends(auth_handler.authenticate),
+    db_manager: Database = Depends(
+        lambda: ObjectFactory.get_instance(Database, ObjectFactory.MOM_DATABASE)
+    ),
 ): # pylint: disable=W0613
     """
     Endpoint to send a message to a topic or queue in the message broker.
@@ -266,13 +268,38 @@ def send_message(
             queue_topic_type,
             message_queue_topic.name,
         )
+        success: bool = False
+        message: str = ""
+        details: str = ""
 
-        # TODO: Implement the logic to create a
-        # queue or topic in the message broker.
-        # This is a placeholder implementation.
-        return f"'{message_queue_topic.message}' published " \
-            + f"by {auth["username"]} to " \
-            + f"{queue_topic_type} {message_queue_topic.name} successfully."
+        if message_queue_topic.type == MomType.QUEUE:
+            manager = MOMQueueManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.enqueue(
+                queue_name=message_queue_topic.name,
+                message=message_queue_topic.message
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+        else:
+            manager = MOMTopicManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.publish(
+                topic_name=message_queue_topic.name,
+                message=message_queue_topic.message
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+
+        logger.info(details)
+        return QueueTopicResponse(
+            success=success,
+            message=message
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=403,
