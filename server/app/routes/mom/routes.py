@@ -240,7 +240,7 @@ def unsubscribe(
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("20/minute")
+@limiter.limit("200/minute")
 def send_message(
     request: Request,
     message_queue_topic: MessageQueueTopic,
@@ -340,7 +340,7 @@ def send_message(
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("20/minute")
+@limiter.limit("200/minute")
 def receive_message(
     request: Request,
     queue_topic: QueueTopic,

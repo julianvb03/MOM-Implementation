@@ -43,7 +43,7 @@ router = APIRouter()
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("15/minute")
+@limiter.limit("100/minute")
 def create_queue_topic(
     request: Request,
     queue_topic: QueueTopic,
@@ -134,7 +134,7 @@ def create_queue_topic(
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("15/minute")
+@limiter.limit("100/minute")
 def delete_queue_topic(
     request: Request,
     name: str,
