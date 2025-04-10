@@ -26,7 +26,7 @@
 ### Root
 
 #### **Endpoint**
-`/`
+`/api/{API_VERSION}/{API_NAME}`
 
 #### **Method**
 `GET`
@@ -72,7 +72,7 @@ Returns a welcome message for the MOM TET API.
 ### Login
 
 #### **Endpoint**
-`/login/`
+`/api/{API_VERSION}/{API_NAME}/login/`
 
 #### **Method**
 `POST`
@@ -143,7 +143,7 @@ Authenticates a user and returns a JWT token.
 ### Protected
 
 #### **Endpoint**
-`/protected/`
+`/api/{API_VERSION}/{API_NAME}/protected/`
 
 #### **Method**
 `GET`
@@ -202,7 +202,7 @@ A protected endpoint requiring authentication, returns a personalized welcome me
 ### Protected Admin
 
 #### **Endpoint**
-`/admin/protected/`
+`/api/{API_VERSION}/{API_NAME}/admin/protected/`
 
 #### **Method**
 `GET`
@@ -271,7 +271,7 @@ A protected endpoint requiring admin authentication, returns a welcome message f
 ### Subscribe
 
 #### **Endpoint**
-`/subscribe/`
+`/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe/`
 
 #### **Method**
 `POST`
@@ -307,11 +307,15 @@ Subscribes an authenticated user to a queue or topic in the message broker.
 ##### Body Parameters (JSON):
 | Field    | Type   | Required | Description                          |
 |----------|--------|----------|--------------------------------------|
-| (none)   | string | Yes      | Success message                      |
+| success   | boolean | Yes      | True if the operation was successful and False otherwise                     |
+| message  | string or null | Yes      | Message logging the operation information                     |
 
 ##### Success Response (200 OK)
 ```json
-"Subscribed to queue-example successfully."
+{
+    "success": true,
+    "message": "User noadmin subscribed to topic topic-example"
+}
 ```
 
 ##### Error Response (401 Unauthorized)
@@ -351,7 +355,7 @@ Subscribes an authenticated user to a queue or topic in the message broker.
 ### Unsubscribe
 
 #### **Endpoint**
-`/unsubscribe/`
+`/api/{API_VERSION}/{API_NAME}/queue_topic/unsubscribe/`
 
 #### **Method**
 `POST`
@@ -387,11 +391,15 @@ Unsubscribes an authenticated user from a queue or topic in the message broker.
 ##### Body Parameters (JSON):
 | Field    | Type   | Required | Description                          |
 |----------|--------|----------|--------------------------------------|
-| (none)   | string | Yes      | Success message                      |
+| success   | boolean | Yes      | True if the operation was successful and False otherwise                     |
+| message  | string or null | Yes      | Message logging the operation information                     |
 
 ##### Success Response (200 OK)
 ```json
-"Unsubscribed of queue-example successfully."
+{
+    "success": true,
+    "message": "User noadmin unsubscribed from queue-example"
+}
 ```
 
 ##### Error Response (401 Unauthorized)
@@ -431,7 +439,7 @@ Unsubscribes an authenticated user from a queue or topic in the message broker.
 ### Send Message
 
 #### **Endpoint**
-`/send/`
+`/api/{API_VERSION}/{API_NAME}/queue_topic/send/`
 
 #### **Method**
 `POST`
@@ -469,11 +477,15 @@ Sends a message to a queue or topic in the message broker by an authenticated us
 ##### Body Parameters (JSON):
 | Field    | Type   | Required | Description                          |
 |----------|--------|----------|--------------------------------------|
-| (none)   | string | Yes      | Success message                      |
+| success   | boolean | Yes      | True if the operation was successful and False otherwise                     |
+| message  | string or null | Yes      | Message logging the operation information                     |
 
 ##### Success Response (200 OK)
 ```json
-"'Hello, world!' published to queue-example successfully."
+{
+    "success": true,
+    "message": "Message published to topic topic-example"
+}
 ```
 
 ##### Error Response (401 Unauthorized)
@@ -513,7 +525,7 @@ Sends a message to a queue or topic in the message broker by an authenticated us
 ### Receive Message
 
 #### **Endpoint**
-`/receive/`
+`/api/{API_VERSION}/{API_NAME}/queue_topic/receive/`
 
 #### **Method**
 `POST`
@@ -549,12 +561,24 @@ Receives a message from a queue or topic in the message broker for an authentica
 ##### Body Parameters (JSON):
 | Field    | Type   | Required | Description                          |
 |----------|--------|----------|--------------------------------------|
-| (none)   | string | Yes      | Success message with received content|
+| success   | boolean | Yes      | True if the operation was successful and False otherwise                     |
+| message  | string or null | Yes      | Content of the queue or topic receive, if the structure is empty is null                    |
 
 ##### Success Response (200 OK)
 ```json
-"'message' received from queue-example successfully."
+{
+    "success": true,
+    "message": "Hello, world!"
+}
 ```
+No messages in the structure: 
+```json
+{
+    "success": true,
+    "message": null
+}
+```
+
 
 ##### Error Response (401 Unauthorized)
 ```json
@@ -595,7 +619,7 @@ Receives a message from a queue or topic in the message broker for an authentica
 ### Remove User
 
 #### **Endpoint**
-`/users/remove/{user}`
+`/api/{API_VERSION}/{API_NAME}/admin/users/remove/{user}`
 
 #### **Method**
 `DELETE`
@@ -673,7 +697,7 @@ Removes a specified user from the system (admin-only).
 ### Create User
 
 #### **Endpoint**
-`/users/create/`
+`/api/{API_VERSION}/{API_NAME}/admin/users/create/`
 
 #### **Method**
 `PUT`
@@ -755,7 +779,7 @@ Creates a new user in the system (admin-only).
 ### Create Queue/Topic
 
 #### **Endpoint**
-`/queue_topic/create/`
+`/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create/`
 
 #### **Method**
 `PUT`
@@ -791,11 +815,15 @@ Creates a new queue or topic in the message broker (admin-only).
 ##### Body Parameters (JSON):
 | Field    | Type   | Required | Description                          |
 |----------|--------|----------|--------------------------------------|
-| (none)   | string | Yes      | Success message                      |
+| success   | boolean | Yes      | True if the operation was successful and False otherwise                     |
+| message  | string or null | Yes      | Message logging the operation information                     |
 
 ##### Success Response (200 OK)
 ```json
-"Queue queue-example created successfully."
+{
+    "success": true,
+    "message": "Queue queue-example created successfully."
+}
 ```
 
 ##### Error Response (401 Unauthorized)
@@ -835,7 +863,7 @@ Creates a new queue or topic in the message broker (admin-only).
 ### Delete Queue/Topic
 
 #### **Endpoint**
-`/queue_topic/delete/{name}?type={type}`
+`/api/{API_VERSION}/{API_NAME}/admin/queue_topic/delete/{name}?type={type}`
 
 #### **Method**
 `DELETE`
@@ -865,11 +893,15 @@ Deletes a queue or topic from the message broker by name (admin-only).
 ##### Body Parameters (JSON):
 | Field    | Type   | Required | Description                          |
 |----------|--------|----------|--------------------------------------|
-| (none)   | string | Yes      | Success message                      |
+| success   | boolean | Yes      | True if the operation was successful and False otherwise                     |
+| message  | string or null | Yes      | Message logging the operation information                     |
 
 ##### Success Response (200 OK)
 ```json
-"Queue/Topic queue-example removed successfully."
+{
+    "success": true,
+    "message": "Queue queue-example deleted successfully."
+}
 ```
 
 ##### Error Response (401 Unauthorized)
