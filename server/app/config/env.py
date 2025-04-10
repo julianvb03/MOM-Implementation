@@ -2,7 +2,6 @@
 
 import os
 
-
 # Basic configuration
 API_NAME = os.getenv('API_NAME')
 API_VERSION = os.getenv('API_VERSION')
@@ -21,7 +20,7 @@ DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
 DEFAULT_USER_NAME = os.getenv('DEFAULT_USER_NAME')
 
 # Node configuration
-NODE_ID = os.getenv("NODE_ID", "mom-unknown")
-NODE_HOST = os.getenv("NODE_HOST", "http://localhost:8000")
-ZOOKEEPER_HOST = os.getenv("ZOOKEEPER_HOST", "localhost")
-ZOOKEEPER_PORT = os.getenv("ZOOKEEPER_PORT", "2181")
+NODE_ID = os.getenv('NODE_ID', 'mom-unknown')
+NODE_HOST = os.getenv('NODE_HOST', 'http://localhost:8000')
+ZOOKEEPER_HOST = os.getenv('ZOOKEEPER_HOST', 'localhost')
+ZOOKEEPER_PORT = os.getenv('ZOOKEEPER_PORT', '2181')
