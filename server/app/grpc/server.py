@@ -2,11 +2,13 @@ from concurrent import futures
 import grpc
 import os
 import redis
+from app.domain.logger_config import logger
 from app.domain.topics.topics_manager import MOMTopicManager
 from app.domain.queues.queues_manager import MOMQueueManager
 from app.domain.utils import TopicKeyBuilder, KeyBuilder
 from app.grpc.replication_service_pb2 import ReplicationResponse, StatusCode
 from app.grpc import replication_service_pb2_grpc
+import json
 
 # Configuración de Redis (mantén tu lógica actual)
 REDIS2_CONFIG = {
@@ -435,15 +437,39 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                     message="Redis connection failed"
                 )
 
-            # validar si la cola existe
-            queue_exists = db.exists(request.queue_name)
+            # Obtener la clave correcta de suscriptores
             subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
+            queue_key = KeyBuilder.metadata_key(request.queue_name)
+            
+            # Verificar si la cola existe
+            if not db.exists(queue_key):
+                logger.critical(f"La cola {queue_key} no existe")
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Queue does not exist")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Queue does not exist"
+                )
+            
+            # Verificar si el usuario ya está suscrito
+            if db.sismember(subscribers_key, request.requester):
+                logger.critical(f"El usuario {request.requester} ya está suscrito a la cola {request.queue_name}")
+                context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+                context.set_details("User is already subscribed to this queue")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="User is already subscribed to this queue"
+                )
+
+            # Suscribir al usuario
             db.sadd(subscribers_key, request.requester)
             
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Queue replicated successfully"
+                message="User subscribed successfully"
             )
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -465,13 +491,23 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                     status_code=StatusCode.REPLICATION_FAILED,
                     message="Redis connection failed"
                 )
+            
+            # Obtener la clave correcta de suscriptores
+            subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
+            queue_key = KeyBuilder.metadata_key(request.queue_name)
+            
+            # Verificar si la cola existe
+            if not db.exists(queue_key):
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Queue does not exist")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Queue does not exist"
+                )
 
-            # validar si la cola existe
-            queue_exists = db.exists(request.queue_name)
-            # validar si el usuario esta suscrito
-            suscribed = db.sismember(request.queue_name, request.requester)
-
-            if not suscribed:
+            # Verificar si el usuario está suscrito
+            if not db.sismember(subscribers_key, request.requester):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("User is not subscribed to this queue")
                 return ReplicationResponse(
@@ -480,15 +516,132 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                     message="User is not subscribed to this queue"
                 )
 
-            subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
-            db.srem(subscribers_key, self.user)
+            # Eliminar la suscripción
+            db.srem(subscribers_key, request.requester)
             
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Queue replicated successfully"
+                message="User unsubscribed successfully"
             )
         except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def QueueReplicateEnqueue(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                logger.error("No se pudo conectar a Redis")
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed"
+                )
+            
+            logger.info(f"Recibida solicitud de encolamiento para cola: {request.queue_name}")
+            queue_manager = MOMQueueManager(db, request.requester)
+            
+            # Verificar si la cola existe
+            metadata_key = KeyBuilder.metadata_key(request.queue_name)
+            if not db.exists(metadata_key):
+                logger.error(f"La cola {request.queue_name} no existe")
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Queue does not exist")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Queue does not exist"
+                )
+
+            result = queue_manager.enqueue(
+                message=request.message,
+                queue_name=request.queue_name,
+                uuid=request.uuid,
+                timestamp=request.timestamp,
+                im_replicating=True
+            )
+
+            logger.info(f"Resultado de la replicación en el servidor: {result}")
+            if not result.success:
+                logger.error(f"Error en replicación: {result.status.value}")
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Message enqueued successfully"
+            )
+        
+        except Exception as e:
+            logger.error(f"Error inesperado en QueueReplicateEnqueue: {str(e)}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def QueueReplicateDequeue(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed"
+                )
+            
+            logger.info(f"Recibida solicitud de desencolamiento para cola: {request.queue_name}")
+            queue_manager = MOMQueueManager(db, request.requester)
+            
+            # Verificar si la cola existe
+            metadata_key = KeyBuilder.metadata_key(request.queue_name)
+            if not db.exists(metadata_key):
+                logger.error(f"La cola {request.queue_name} no existe")
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Queue does not exist")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Queue does not exist"
+                )
+
+            # Buscar el mensaje por UUID y desencolarlo
+            queue_key = KeyBuilder.queue_key(request.queue_name)
+            messages = db.lrange(queue_key, 0, -1)
+            for i, msg in enumerate(messages):
+                message = json.loads(msg)
+                if message["id"] == request.uuid:
+                    db.lset(queue_key, i, "__DELETED__")
+                    db.lrem(queue_key, 1, "__DELETED__")
+                    db.hincrby(metadata_key, "total_messages", -1)
+                    break
+
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Message dequeued successfully"
+            )
+        
+        except Exception as e:
+            logger.error(f"Error inesperado en QueueReplicateDequeue: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(

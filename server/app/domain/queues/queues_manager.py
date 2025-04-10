@@ -4,7 +4,7 @@ including creating, deleting, enqueuing, and dequeuing messages.
 """
 
 import json
-import uuid
+import uuid as uuid_lib
 from datetime import datetime, timezone
 from app.domain.models import MOMQueueStatus, QueueOperationResult
 from app.domain.logger_config import logger
@@ -76,6 +76,7 @@ class MOMQueueManager:
 
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is True:
+                result.replication_result = False
                 return result
 
             if created_at == None:
@@ -125,12 +126,14 @@ class MOMQueueManager:
                 False, MOMQueueStatus.INTERNAL_ERROR, str(e)
             )
 
-    def enqueue(self, message: str, queue_name: str, uuid: str = None, timestamp = None) -> QueueOperationResult:
+    def enqueue(self, message: str, queue_name: str, uuid: str = None, timestamp = None, im_replicating = False) -> QueueOperationResult:
         """
         Enqueue a message to the specified queue.
         Args:
             message (str): The message to enqueue.
             queue_name (str): The name of the queue to enqueue the message to.
+            uuid (str): The UUID of the message.
+            timestamp (float): The timestamp of the message.
         Returns:
             QueueOperationResult: Result of the enqueue operation.
         """
@@ -140,6 +143,8 @@ class MOMQueueManager:
 
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                print(f"Result validate_queue_exists: {result}")
+                result.replication_result = False
                 return result
 
             # Se decidio que el usuario no debe estar subscrito para
@@ -149,13 +154,15 @@ class MOMQueueManager:
             #     return result
 
             principal = bool(int(self.redis.hget(metadata_key, "original_node")))
+            logger.critical(f"im_replicating: {im_replicating}")
+            logger.critical(f"Principal: {self.redis.hget(metadata_key, "original_node")}")
             if principal and uuid is None:
-                message_id = str(uuid.uuid4())
+                uuid = str(uuid_lib.uuid4())
             if principal and timestamp is None:
-                timestamp = datetime.now(timezone.utc).isoformat()
+                timestamp = datetime.now(timezone.utc).timestamp()
 
             full_message = {
-                "id": message_id,
+                "id": uuid,
                 "timestamp": timestamp,
                 "payload": json.dumps(message),
             }
@@ -163,27 +170,50 @@ class MOMQueueManager:
             self.redis.hincrby(metadata_key, "total_messages", 1)
             ## TO DO
             ## Garantizar la replicación de los mensajes
+            replication_result = True  # Asumir éxito por defecto
+            if not im_replicating:  # Solo replicar si no es una replicación
+                if principal:
+                    replication_result = self.replication_client.enqueue(
+                        queue_name=queue_name,
+                        user=self.user,
+                        message=message,
+                        uuid=uuid,
+                        timestamp=timestamp
+                    )
+                else:
+                    replication_result = self.replication_principal.enqueue(
+                        queue_name=queue_name,
+                        user=self.user,
+                        message=message,
+                        uuid=uuid,
+                        timestamp=timestamp
+                    )
+                logger.info(f"Resultado de la replicación: {replication_result}")
 
             return QueueOperationResult(
-                True,
-                MOMQueueStatus.SUCCES_OPERATION,
-                "Message enqueued successfully",
+                success=True,
+                status=MOMQueueStatus.SUCCES_OPERATION,
+                details="Message enqueued successfully",
+                replication_result=replication_result
             )
-        except Exception as e: # pylint: disable=W0718
-            logger.exception("Error denqueueing message to '%s'",queue_name)
+        except Exception as e:
+            logger.exception(f"Error enqueueing message to '{queue_name}'")
             return QueueOperationResult(
-                False, MOMQueueStatus.INTERNAL_ERROR, str(e)
+                success=False, 
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details=str(e),
+                replication_result=False
             )
 
     def dequeue(
-        self, queue_name: str, block: bool = False, timeout: int = 0, uuid: str = None
+        self, queue_name: str, uuid: str = None, im_replicating: bool = False
     ) -> QueueOperationResult:
         """
         Dequeue a message from the specified queue.
         Args:
             queue_name (str): The name of the queue to dequeue from.
-            block (bool): Whether to block until a message is available.
-            timeout (int): Timeout for blocking dequeue.
+            uuid (str): The UUID of the message to dequeue.
+            im_replicating (bool): Whether this is a replication operation.
         Returns:
             QueueOperationResult: Result of the dequeue operation.
         """
@@ -193,32 +223,72 @@ class MOMQueueManager:
         try:
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                result.replication_result = False
                 return result
 
             result = self.validator.validate_user_subscribed(queue_name)
             if result.success is False:
+                result.replication_result = False
                 return result
 
-            if block:
-                result = self.redis.blpop(queue_key, timeout=timeout)
-                if not result:
+            principal = bool(int(self.redis.hget(metadata_key, "original_node")))
+            
+            if uuid is not None:
+                # Caso con UUID específico
+                messages = self.redis.lrange(queue_key, 0, -1)
+                message_to_dequeue = None
+                for msg in messages:
+                    msg_data = json.loads(msg)
+                    if msg_data["id"] == uuid:
+                        message_to_dequeue = msg_data
+                        # Eliminar el mensaje específico
+                        self.redis.lrem(queue_key, 1, msg)
+                        break
+                
+                if not message_to_dequeue:
                     return QueueOperationResult(
-                        True, MOMQueueStatus.EMPTY_QUEUE, ""
+                        success=False,
+                        status=MOMQueueStatus.MESSAGE_NOT_FOUND,
+                        details="Message not found",
+                        replication_result=False
                     )
-                message = json.loads(result[1])
             else:
+                # Caso de pop normal
                 message_json = self.redis.lpop(queue_key)
                 if not message_json:
                     return QueueOperationResult(
-                        True, MOMQueueStatus.EMPTY_QUEUE, ""
+                        success=True,
+                        status=MOMQueueStatus.EMPTY_QUEUE, 
+                        details="",
+                        replication_result=False
                     )
-                message = json.loads(message_json)
+                message_to_dequeue = json.loads(message_json)
 
             self.redis.hincrby(metadata_key, "total_messages", -1)
+            
+            # Replicación
+            replication_result = True
+            if not im_replicating:
+                if not principal:
+                    # Si no soy principal, replico al nodo original
+                    replication_result = self.replication_principal.dequeue(
+                        queue_name=queue_name,
+                        user=self.user,
+                        uuid=message_to_dequeue["id"]
+                    )
+                else:
+                    # Si soy principal, replico a quien me replica a mí
+                    replication_result = self.replication_client.dequeue(
+                        queue_name=queue_name,
+                        user=self.user,
+                        uuid=message_to_dequeue["id"]
+                    )
+
             return QueueOperationResult(
-                True,
-                MOMQueueStatus.SUCCES_OPERATION,
-                json.loads(message["payload"]),
+                success=True,
+                status=MOMQueueStatus.SUCCES_OPERATION,
+                details=json.loads(message_to_dequeue["payload"]),
+                replication_result=replication_result
             )
 
         except Exception as e: # pylint: disable=W0718

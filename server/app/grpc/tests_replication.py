@@ -62,6 +62,18 @@ if __name__ == "__main__":
     if n_test == 9:
         queue_manager = MOMQueueManager(client, "user_random")
         result = queue_manager.subscriptions.unsubscribe("test_queue")
+    
+    if n_test == 10:
+        queue_manager = MOMQueueManager(client, "test_user")
+        result = queue_manager.enqueue("hola mia amor", "test_queue")
+
+    if n_test == 11:
+        queue_manager = MOMQueueManager(client, "user_random")
+        result = queue_manager.dequeue("test_queue")
+
+    if n_test == 12:
+        queue_manager = MOMQueueManager(client, "test_user")
+        result = queue_manager.dequeue("test_queue")
 
         
     print("Result Status: ", result.status, "Success:", result.status, "Details:", result.details, "Replication:", result.replication_result)

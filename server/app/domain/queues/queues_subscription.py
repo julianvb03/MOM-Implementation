@@ -71,10 +71,12 @@ class SubscriptionService:
 
             # Replicación
             replication_op = False
-            if principal:
-                replication_op = self.replication_client.subscribe(queue_name, self.user)
-            else:
+            if not principal:
+                # Si no soy principal, replico al nodo original
                 replication_op = self.replication_principal.subscribe(queue_name, self.user)
+            else:
+                # Si soy principal, replico a quien me replica a mí
+                replication_op = self.replication_client.subscribe(queue_name, self.user)
 
             return QueueOperationResult(
                 success=True,
@@ -128,10 +130,12 @@ class SubscriptionService:
             principal = bool(int(result))
             # Replicación
             replication_op = False
-            if principal:
-                replication_op = self.replication_client.unsubscribe(queue_name, self.user)
-            else:
+            if not principal:
+                # Si no soy principal, replico al nodo original
                 replication_op = self.replication_principal.unsubscribe(queue_name, self.user)
+            else:
+                # Si soy principal, replico a quien me replica a mí
+                replication_op = self.replication_client.unsubscribe(queue_name, self.user)
 
             return QueueOperationResult(
                 success=True,

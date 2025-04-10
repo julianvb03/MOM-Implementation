@@ -71,11 +71,72 @@ class QueueReplicationClient:
         except Exception as e:
             return False
 
-    def enqueue(self, queue_name: str, message: str):
-        pass
+    def enqueue(self, queue_name: str, user: str, message: str, uuid: str, timestamp: float):
+        if not self.stub:
+            logger.error("No hay stub disponible para replicación")
+            return False
 
-    def dequeue(self, queue_name: str, u):
-        pass
+        try:
+            request = EnqueueRequest(
+                queue_name=queue_name,
+                requester=user,
+                message=message,
+                uuid=uuid,
+                timestamp=timestamp
+            )
+
+            logger.info(f"Enviando solicitud de encolamiento a {self.target_node_desc}")
+            response = self.stub.QueueReplicateEnqueue(request)
+
+            if response.success:
+                logger.info("Encolamiento replicado exitosamente")
+                return True
+            else:
+                logger.error(f"Error en replicación: {response.message}")
+                return False
+        
+        except grpc.RpcError as e:
+            logger.error(f"Error gRPC en replicación: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error inesperado en replicación: {str(e)}")
+            return False
+            
+
+    def dequeue(self, queue_name: str, user: str, uuid: str) -> bool:
+        """
+        Replica una operación de dequeue en el nodo remoto.
+        
+        Args:
+            queue_name (str): Nombre de la cola
+            user (str): Usuario que realiza la operación
+            uuid (str): UUID del mensaje a desencolar
+            
+        Returns:
+            bool: True si la replicación fue exitosa, False en caso contrario
+        """
+        if not self.stub:
+            logger.error("No hay stub disponible para replicación")
+            return False
+            
+        try:
+            request = DequeueRequest(
+                queue_name=queue_name,
+                requester=user,
+                uuid=uuid
+            )
+            
+            response = self.stub.QueueReplicateDequeue(request)
+            if response.success:
+                logger.info(f"Dequeue replicado exitosamente en {self.target_node_desc}")
+                return True
+            else:
+                logger.error(f"Error en replicación de dequeue: {response.message}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error inesperado en replicación de dequeue: {str(e)}")
+            return False
 
     def subscribe(self, queue_name: str, user: str):
         if not self.stub:
