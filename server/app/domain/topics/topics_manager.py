@@ -226,7 +226,7 @@ class MOMTopicManager:
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.MESSAGE_PUBLISHED,
-                        details="Message not replicated",
+                        details=f"Message published to topic {topic_name}, but replication failed",
                         replication_result=False
                     )
 
@@ -264,6 +264,15 @@ class MOMTopicManager:
             TopicOperationResult: Result containing consumed string messages.
         """
         try:
+            metadata_key = TopicKeyBuilder.metadata_key(topic_name)
+            if not self.redis.exists(metadata_key):
+                return TopicOperationResult(
+                    success=False,
+                    status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                    details="Topic does not exist",
+                    replication_result=False
+                )
+                
             subscribers_key = TopicKeyBuilder.subscribers_key(topic_name)
             if not self.redis.sismember(subscribers_key, self.user):
                 return TopicOperationResult(
@@ -375,7 +384,7 @@ class MOMTopicManager:
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.NO_MESSAGES,
-                        details="No new messages",
+                        details="",
                         replication_result=False if self_consume is False else True # pylint: disable=C0301
                     )
 
@@ -648,7 +657,7 @@ class MOMTopicManager:
                         return TopicOperationResult(
                             success=True,
                             status=MOMTopicStatus.TOPIC_DELETED,
-                            details="Topic not replicated",
+                            details="Topic deleted successfully, but replication failed",
                             replication_result=False
                         )
 

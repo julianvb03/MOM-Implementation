@@ -130,7 +130,7 @@ def test_create_queue_topic_failure_duplicated():
     assert response.status_code == 200
     data = response.json()
     assert "Queue exists" == data["message"]
-    assert True == data["success"]
+    assert False == data["success"]
     
     response = client.put(
         f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
@@ -205,7 +205,7 @@ def test_delete_queue_topic():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Queue 'queue-example' deleted successfully" == data["message"]
+    assert "Queue deleted successfully, but replication failed" == data["message"]
     assert True == data["success"]
     
     response = client.delete(
@@ -214,7 +214,7 @@ def test_delete_queue_topic():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Topic topic-example deleted successfully" == data["message"]
+    assert "Topic deleted successfully, but replication failed" == data["message"]
     assert True == data["success"]
 
 

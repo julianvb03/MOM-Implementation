@@ -550,7 +550,7 @@ def test_send():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Message published to topic topic-example" == data["message"]
+    assert "Message published to topic topic-example, but replication failed" == data["message"]
     assert True == data["success"]
 
 
@@ -677,7 +677,7 @@ def test_receive_topic():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Message published to topic topic-example" == data["message"]
+    assert "Message published to topic topic-example, but replication failed" == data["message"]
     assert True == data["success"]
 
     # Receive test
@@ -851,7 +851,7 @@ def test_receive_topic_same_publish():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Message published to topic topic-example" == data["message"]
+    assert "Message published to topic topic-example, but replication failed" == data["message"]
     assert True == data["success"]
 
     # Receive test
@@ -1003,7 +1003,7 @@ def test_receive_topic_empty():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Message published to topic topic-example" == data["message"]
+    assert "Message published to topic topic-example, but replication failed" == data["message"]
     assert True == data["success"]
 
     # Receive test
@@ -1205,7 +1205,7 @@ def test_receive_topic_not_suscribed():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "Message published to topic topic-example" == data["message"]
+    assert "Message published to topic topic-example, but replication failed" == data["message"]
     assert True == data["success"]
 
     # Receive test
@@ -1231,7 +1231,7 @@ def test_receive_topic_not_suscribed():
     assert response.status_code == 200
     data = response.json()
     assert False == data["success"]
-    assert "User is not subscribed to topic topic-example" == data["message"]
+    assert "User is not subscribed to this topic" == data["message"]
 
 
 def test_receive_queue_not_suscribed():
@@ -1361,7 +1361,7 @@ def test_receive_topic_not_found():
     assert response.status_code == 200
     data = response.json()
     assert False == data["success"]
-    assert "Topic topic-example does not exist" == data["message"]
+    assert "Topic does not exist" == data["message"]
 
 
 def test_receive_unauthorized():

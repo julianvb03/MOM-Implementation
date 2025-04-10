@@ -75,7 +75,7 @@ class MOMQueueManager:
             metadata_key = KeyBuilder.metadata_key(queue_name)
 
             result = self.validator.validate_queue_exists(queue_name)
-            if result.success is True:
+            if result.success:
                 result.success = False
                 result.replication_result = False
                 return result
@@ -106,7 +106,6 @@ class MOMQueueManager:
                     created_at=created_at
                 )
                 if result is False:
-                    self.redis.delete(metadata_key, queue_key)
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.INTERNAL_ERROR,

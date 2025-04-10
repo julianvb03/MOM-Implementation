@@ -394,7 +394,7 @@ def receive_message(
             message = result.details
             details = result.status.value
             
-        if message == "No new messages":
+        if message == "":
             message = None
         
         logger.info(details)
