@@ -117,7 +117,7 @@ class MOMTopicManager:
                             return TopicOperationResult(
                                 success=True,
                                 status=MOMTopicStatus.TOPIC_CREATED,
-                                details="Topic not replicated",
+                                details=f"Topic {topic_name} created successfully",
                                 replication_result=False
                             )
 
