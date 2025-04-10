@@ -18,7 +18,7 @@ class MessageQueueTopic(QueueTopic):
         description="Message to be sent to the queue or topic",
         json_schema_extra={"example": "Hello, World!"}
     )
-    
+
 
 class QueueTopicResponse(BaseModel):
     """

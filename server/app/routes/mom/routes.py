@@ -1,11 +1,16 @@
 """
 This module defines the admin mom management endpoints of the API.
 """
+from app.adapters.factory import ObjectFactory
+from app.adapters.db import Database
 from app.auth.auth import auth_handler
 from app.config.limiter import limiter
 from app.config.logging import logger
+from app.domain.queues.queues_manager import MOMQueueManager
+from app.domain.topics.topics_manager import MOMTopicManager
 from app.dtos.general_dtos import ResponseError
-from app.dtos.mom_dto import QueueTopic, MessageQueueTopic
+from app.dtos.admin.mom_management_dto import MomType
+from app.dtos.mom_dto import QueueTopic, MessageQueueTopic, QueueTopicResponse
 from app.utils.exceptions import raise_exception
 from fastapi import APIRouter, HTTPException, Request, status, Depends
 from slowapi.errors import RateLimitExceeded
@@ -18,7 +23,7 @@ router = APIRouter()
             tags=["Mom"],
             status_code=status.HTTP_200_OK,
             summary="Endpoint for a user to subscribe to a topic or queue.",
-            response_model=str,
+            response_model=QueueTopicResponse,
             responses={
                 500: {
                     "model": ResponseError, 
@@ -37,11 +42,14 @@ router = APIRouter()
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("20/minute")
+@limiter.limit("200/minute")
 def subscribe(
     request: Request,
     queue_topic: QueueTopic,
-    auth: dict = Depends(auth_handler.authenticate)
+    auth: dict = Depends(auth_handler.authenticate),
+    db_manager: Database = Depends(
+        lambda: ObjectFactory.get_instance(Database, ObjectFactory.MOM_DATABASE)
+    ),
 ): # pylint: disable=W0613
     """
     Endpoint to subscribe a user to a topic or
@@ -64,12 +72,33 @@ def subscribe(
             queue_topic.name,
         )
 
-        # TODO: Implement the logic to create a
-        # queue or topic in the message broker.
-        # This is a placeholder implementation.
-        return f"{auth["username"]} subscribed to " \
-            + f"{queue_topic_type} {queue_topic.name}" \
-            + " successfully."
+        if queue_topic.type == MomType.QUEUE:
+            manager = MOMQueueManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.subscriptions.subscribe(
+                queue_name=queue_topic.name
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+        else:
+            manager = MOMTopicManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.subscriptions.subscribe(
+                topic_name=queue_topic.name
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+
+        logger.info(details)
+
+        return QueueTopicResponse(
+            success=success,
+            message=message
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=403,
@@ -109,7 +138,7 @@ def subscribe(
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("20/minute")
+@limiter.limit("200/minute")
 def unsubscribe(
     request: Request,
     queue_topic: QueueTopic,
