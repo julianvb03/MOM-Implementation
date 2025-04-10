@@ -54,6 +54,15 @@ if __name__ == "__main__":
     if n_test == 7:
         queue_manager = MOMQueueManager(client, "test_user")
         result = queue_manager.delete_queue(queue_name="test_queue")
+
+    if n_test == 8:
+        queue_manager = MOMQueueManager(client, "user_random")
+        result = queue_manager.subscriptions.subscribe("test_queue")
+
+    if n_test == 9:
+        queue_manager = MOMQueueManager(client, "user_random")
+        result = queue_manager.subscriptions.unsubscribe("test_queue")
+
         
     print("Result Status: ", result.status, "Success:", result.status, "Details:", result.details, "Replication:", result.replication_result)
     #flush_redis()

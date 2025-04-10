@@ -74,11 +74,49 @@ class QueueReplicationClient:
     def enqueue(self, queue_name: str, message: str):
         pass
 
-    def dequeue(self, queue_name: str):
+    def dequeue(self, queue_name: str, u):
         pass
 
-    def subscribe(self, queue_name: str):
-        pass
+    def subscribe(self, queue_name: str, user: str):
+        if not self.stub:
+            return False
 
-    def unsubscribe(self, queue_name: str):
-        pass
+        try:
+            request = QueueSubscribeRequest(
+                queue_name=queue_name,
+                requester=user
+            )
+            
+            response = self.stub.QueueReplicateSubscribe(request)
+            
+            if response.success:
+                return True
+            else:
+                return False
+                
+        except grpc.RpcError as e:
+            return False
+        except Exception as e:
+            return False
+
+    def unsubscribe(self, queue_name: str, user: str):
+        if not self.stub:
+            return False
+
+        try:
+            request = QueueUnsubscribeRequest(
+                queue_name=queue_name,
+                requester=user
+            )
+            
+            response = self.stub.QueueReplicateUnsubscribe(request)
+            
+            if response.success:
+                return True
+            else:
+                return False
+                
+        except grpc.RpcError as e:
+            return False
+        except Exception as e:
+            return False
