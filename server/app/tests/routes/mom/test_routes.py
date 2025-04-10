@@ -924,7 +924,7 @@ def test_receive_queue_same_publish():
     assert response.status_code == 200
     data = response.json()
     assert True == data["success"]
-    assert None == data["message"]
+    assert "Hello, World!" == data["message"]
 
 
 def test_receive_topic_empty():
