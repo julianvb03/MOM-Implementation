@@ -370,8 +370,116 @@ def test_unsubscribe_queue_topic():
     )
     assert response.status_code == 200
     data = response.json()
-    assert "noadmin unsubscribed to Queue queue-example successfully." == data["message"]
+    assert "User noadmin unsubscribed from queue-example" == data["message"]
     assert True == data["success"]
+
+
+def test_unsubscribe_queue_topic_already_unsubscribed():
+    """
+    Test the unsubscribe queue topic endpoint
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": DEFAULT_USER_NAME,
+        "password": DEFAULT_USER_PASSWORD
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.put(
+        f"/api/{API_VERSION}/{API_NAME}/admin/queue_topic/create",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Topic topic-example created successfully" == data["message"]
+    assert True == data["success"]
+    
+    # Suscribe test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/subscribe",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User noadmin subscribed to topic topic-example" == data["message"]
+    assert True == data["success"]
+
+    # Unsubscribe test
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/unsubscribe",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "User noadmin unsubscribed from topic topic-example" == data["message"]
+    assert True == data["success"]
+
+
+def test_unsubscribe_queue_topic_not_found():
+    """
+    Test the unsubscribe queue topic endpoint
+    """
+    response = client.post(f"/api/{API_VERSION}/{API_NAME}/login/", json={
+        "username": "noadmin",
+        "password": "123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    token = data["access_token"]
+    token_type = data["token_type"]
+    headers = {
+        "Authorization": f"{token_type} {token}"
+    }
+    response = client.post(
+        f"/api/{API_VERSION}/{API_NAME}/queue_topic/unsubscribe",
+        headers=headers,
+        json={
+            "name": "topic-example",
+            "type": "topic"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "Topic topic-example does not exist" == data["message"]
+    assert False == data["success"]
 
 
 def test_unsubscribe_queue_topic_unauthorized():
