@@ -25,16 +25,6 @@ services:
       - .env
     depends_on:
       - redis
-      - zookeeper
-    networks:
-      - redis-network
-
-  zookeeper:
-    image: zookeeper:3.7
-    container_name: zookeeper
-    restart: always
-    ports:
-      - "2181:2181"
     networks:
       - redis-network
 

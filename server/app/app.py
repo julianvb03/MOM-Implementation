@@ -25,10 +25,6 @@ from app.routes.admin.routes import router as admin_router
 from app.routes.mom.routes import router as mom_router
 from app.routes.routes import router
 from app.utils.db import initialize_database
-from app.zookeeper.zookeeper_manager import ZookeeperManager
-
-# ZookeeperManager instance (global)
-zk_manager = ZookeeperManager()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -41,14 +37,10 @@ async def lifespan(_: FastAPI):
     # Initialize DB
     initialize_database()
 
-    # Start Zookeeper logic
-    zk_manager.start()
-
     yield  # Let the app run
 
     # On shutdown
     print("🛑 API shutting down...")
-    zk_manager.stop()
 
 # FastAPI Metadata
 title = f"{API_NAME} API"
