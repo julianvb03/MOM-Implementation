@@ -7,6 +7,8 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    env_file:
+      - .env
     volumes:
       - redis_data:/data
     networks:
@@ -19,11 +21,28 @@ services:
     restart: always
     ports:
       - "8001:6379"
+    env_file:
+      - .env
     volumes:
       - redis_users_data:/data
     networks:
       - redis-network
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_USERS_PASSWORD}
+
+  mom-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mom-server
+    restart: always
+    ports:
+      - "8080:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    networks:
+      - redis-network
 
 volumes:
   redis_data:
