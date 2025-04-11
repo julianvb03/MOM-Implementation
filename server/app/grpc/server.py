@@ -49,30 +49,30 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed",
+                        message="Redis connection failed",
                 )
-
+            
             topic_manager = MOMTopicManager(db, request.owner)
             result = topic_manager.create_topic(
                 topic_name=request.topic_name,
                 principal=False,
-                created_at=request.created_at,
+                    created_at=request.created_at,
             )
-
+            
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value,
+                        message=result.status.value,
                 )
-
+            
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Topic replicated successfully",
-            )
+                    message="Topic replicated successfully",
+                )
         except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
@@ -80,8 +80,8 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 success=False,
                 status_code=StatusCode.REPLICATION_FAILED,
                 message=str(e)
-            )
-
+        )
+    
     def TopicReplicateDelete(self, request, context):
         try:
             db = create_redis2_connection()
@@ -91,9 +91,9 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message="Redis connection failed",
+                        message="Redis connection failed",
                 )
-
+            
             topic_manager = MOMTopicManager(db, request.requester)
 
             # Verificar si el tópico existe
@@ -117,24 +117,24 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                     message="Permission denied",
                 )
 
-            result = topic_manager.delete_topic(
-                topic_name=request.topic_name, principal=False
-            )
-
-            if not result.success:
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(result.status.value)
-                return ReplicationResponse(
-                    success=False,
-                    status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value,
+                result = topic_manager.delete_topic(
+                    topic_name=request.topic_name, principal=False
                 )
 
-            return ReplicationResponse(
-                success=True,
-                status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Topic replicated successfully",
-            )
+                if not result.success:
+                    context.set_code(grpc.StatusCode.INTERNAL)
+                    context.set_details(result.status.value)
+                    return ReplicationResponse(
+                        success=False,
+                        status_code=StatusCode.REPLICATION_FAILED,
+                        message=result.status.value,
+                    )
+
+                return ReplicationResponse(
+                    success=True,
+                    status_code=StatusCode.REPLICATION_SUCCESS,
+                    message="Topic replicated successfully",
+                )
         except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
@@ -364,21 +364,21 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 principal=False,
                 created_at=request.created_at,
             )
-
+            
             if not result.success:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(result.status.value)
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value,
+                        message=result.status.value,
                 )
-
+            
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Queue replicated successfully",
-            )
+                    message="Queue replicated successfully",
+                )
         except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))

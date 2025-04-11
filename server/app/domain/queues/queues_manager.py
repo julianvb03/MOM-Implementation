@@ -30,7 +30,7 @@ class MOMQueueManager:
 
     def __init__(self, redis_connection, user: str):
         self.redis = redis_connection
-        self.redis_backup = db = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE)
+        self.redis_backup = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE).get_client()
         self.user = user
         self.subscriptions = SubscriptionService(self.redis, self.user)
         self.validator = QueueValidator(self.redis, user)
