@@ -20,11 +20,12 @@ from app.config.env import (
     API_VERSION
 )
 from app.config.limiter import limiter
+from app.dtos.admin.mom_management_dto import QueueTopic
 from app.routes.admin.mom_management.routes import router as admin_mom_management_router
 from app.routes.admin.routes import router as admin_router
 from app.routes.mom.routes import router as mom_router
 from app.routes.routes import router
-from app.utils.db import initialize_database
+from app.utils.db import initialize_database, backup_database
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -36,6 +37,20 @@ async def lifespan(_: FastAPI):
 
     # Initialize DB
     initialize_database()
+    
+    # Backup DB
+    # TODO: Replace element for endpoint call to zookeeper
+    elements = [
+        QueueTopic(
+            name="queue-example",
+            type="queue",
+        ),
+        QueueTopic(
+            name="topic-example",
+            type="topic",
+        )
+    ]
+    backup_database(elements)
 
     yield  # Let the app run
 

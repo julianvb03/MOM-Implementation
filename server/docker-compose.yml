@@ -7,8 +7,6 @@ services:
     restart: always
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
     networks:
       - redis-network
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
@@ -28,9 +26,20 @@ services:
     networks:
       - redis-network
 
-volumes:
-  redis_data:
-    driver: local
+  mom-server-grpc:
+    build:
+      context: .
+      dockerfile: Dockerfile.grpc
+    container_name: mom-server-grpc
+    restart: always
+    ports:
+      - "50051:50051"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    networks:
+      - redis-network
 
 networks:
   redis-network:
