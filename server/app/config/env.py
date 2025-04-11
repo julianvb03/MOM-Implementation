@@ -15,6 +15,12 @@ REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = os.getenv('REDIS_PORT')
 
+# Backup Database configuration
+# Database configuration
+REDIS_BACKUP_PASSWORD = os.getenv('REDIS_BACKUP_PASSWORD')
+REDIS_BACKUP_HOST = os.getenv('REDIS_BACKUP_HOST')
+REDIS_BACKUP_PORT = os.getenv('REDIS_BACKUP_PORT')
+
 # Users Database configuration
 REDIS_USERS_PASSWORD = os.getenv('REDIS_USERS_PASSWORD')
 REDIS_USERS_HOST = os.getenv('REDIS_USERS_HOST')
