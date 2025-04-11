@@ -62,3 +62,6 @@ __pycache__/
 
 # Environment variables
 .env
+
+# Temporal files
+temp/

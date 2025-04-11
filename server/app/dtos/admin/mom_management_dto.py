@@ -16,6 +16,7 @@ class QueueTopic(BaseModel):
     
     Attributes:
         name (str): Unique identifier for the queue or topic.
+        type (MomType): Type of the queue or topic.
     """
     name: str = Field(
         ...,
@@ -23,16 +24,6 @@ class QueueTopic(BaseModel):
         pattern=r"^[a-zA-Z0-9_-]+$",
         json_schema_extra={"example": "my_queue"}
     )
-
-
-class CreateQueueTopic(QueueTopic):
-    """
-    QueueTopic dto for creating a new queue or topic.
-    
-    Attributes:
-        name (str): Unique identifier for the queue or topic.
-        type (MomType): Type of the queue or topic.
-    """
     type: MomType = Field(
         ...,
         description="Type of the queue or topic",

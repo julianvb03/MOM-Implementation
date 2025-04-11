@@ -1,13 +1,18 @@
 """
 This module defines the admin mom management endpoints of the API.
 """
+from app.adapters.factory import ObjectFactory
+from app.adapters.db import Database
 from app.auth.auth import auth_handler
 from app.config.limiter import limiter
 from app.config.logging import logger
+from app.domain.queues.queues_manager import MOMQueueManager
+from app.domain.topics.topics_manager import MOMTopicManager
 from app.dtos.general_dtos import ResponseError
-from app.dtos.admin.mom_management_dto import CreateQueueTopic
+from app.dtos.mom_dto import QueueTopicResponse
+from app.dtos.admin.mom_management_dto import QueueTopic, MomType
 from app.utils.exceptions import raise_exception
-from fastapi import APIRouter, HTTPException, Request, status, Depends
+from fastapi import APIRouter, HTTPException, Request, status, Depends, Query
 from slowapi.errors import RateLimitExceeded
 
 
@@ -19,7 +24,7 @@ router = APIRouter()
             status_code=status.HTTP_200_OK,
             summary="Endpoint to create a topic or " \
                 + "queue in the message broker.",
-            response_model=str,
+            response_model=QueueTopicResponse,
             responses={
                 500: {
                     "model": ResponseError, 
@@ -38,17 +43,20 @@ router = APIRouter()
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("15/minute")
+@limiter.limit("100/minute")
 def create_queue_topic(
     request: Request,
-    queue_topic: CreateQueueTopic,
-    auth: dict = Depends(auth_handler.authenticate_as_admin)
+    queue_topic: QueueTopic,
+    auth: dict = Depends(auth_handler.authenticate_as_admin),
+    db_manager: Database = Depends(
+        lambda: ObjectFactory.get_instance(Database, ObjectFactory.MOM_DATABASE)
+    ),
 ): # pylint: disable=W0613
     """
     Endpoint to create a topic or queue in the message broker.
     
     Args:
-        queue_topic (CreateQueueTopic): Queue or topic to be created.
+        queue_topic (QueueTopic): Queue or topic to be created.
         auth (dict): Authenticated user information.
     Returns:
         (str): Success message or error message.
@@ -59,14 +67,39 @@ def create_queue_topic(
             "Queue" if queue_topic.type.value == "queue" else "Topic",
             queue_topic.name
         )
+        success: bool = False
+        message: str = ""
+        details: str = ""
 
-        # TODO: Implement the logic to create a
-        # queue or topic in the message broker.
-        # This is a placeholder implementation.
+        if queue_topic.type == MomType.QUEUE:
+            manager = MOMQueueManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.create_queue(
+                queue_name=queue_topic.name,
+                endpoint=True
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+        else:
+            manager = MOMTopicManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.create_topic(
+                topic_name=queue_topic.name,
+                endpoint=True
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
 
-        # pylint: disable=inconsistent-quotes
-        return f"{'Queue' if queue_topic.type.value == 'queue' else 'Topic'} " \
-            + f"{queue_topic.name} created successfully."
+        logger.info(details)
+
+        return QueueTopicResponse(
+            success=success,
+            message=message
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=403,
@@ -88,7 +121,7 @@ def create_queue_topic(
             status_code=status.HTTP_200_OK,
             summary="Endpoint to delete a topic " \
                 + "or queue in the message broker.",
-            response_model=str,
+            response_model=QueueTopicResponse,
             responses={
                 500: {
                     "model": ResponseError, 
@@ -107,31 +140,71 @@ def create_queue_topic(
                     "description": "Forbidden."
                 }
             })
-@limiter.limit("15/minute")
+@limiter.limit("100/minute")
 def delete_queue_topic(
     request: Request,
     name: str,
-    auth: dict = Depends(auth_handler.authenticate_as_admin)
+    mom_type: MomType = Query(
+        ...,
+        description="Type of the queue or topic to delete",
+        examples="queue"
+    ),
+    auth: dict = Depends(auth_handler.authenticate_as_admin),
+    db_manager: Database = Depends(
+        lambda: ObjectFactory.get_instance(Database, ObjectFactory.MOM_DATABASE)
+    ),
 ): # pylint: disable=W0613
     """
     Endpoint to delete a topic or queue in the message broker.
     
     Args:
         name (str): Name of the queue or topic to be deleted.
+        type (MomType): Type of the queue or topic to be deleted.
         auth (dict): Authenticated user information.
     Returns:
         (str): Success message or error message.
     """
     try:
+        queue_topic = QueueTopic(name=name, type=mom_type)
         logger.info(
-            "Queue/Topic removal attempt for %s.",
+            "%s removal attempt for %s.",
+            "Queue" if queue_topic.type.value == "queue" else "Topic",
+            queue_topic.name
         )
 
-        # TODO: Implement the logic to create a
-        # queue or topic in the message broker.
-        # This is a placeholder implementation.
-        return "Queue/Topic " \
-            + f"{name} removed successfully."
+        success: bool = False
+        message: str = ""
+        details: str = ""
+
+        if queue_topic.type == MomType.QUEUE:
+            manager = MOMQueueManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.delete_queue(
+                queue_name=queue_topic.name,
+                endpoint=True
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+        else:
+            manager = MOMTopicManager(
+                redis_connection=db_manager.get_client(), user=auth["username"]
+            )
+            result = manager.delete_topic(
+                topic_name=queue_topic.name,
+                endpoint=True
+            )
+            success = result.success
+            message = result.details
+            details = result.status.value
+
+        logger.info(details)
+
+        return QueueTopicResponse(
+            success=success,
+            message=message
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=403,

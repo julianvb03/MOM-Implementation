@@ -74,7 +74,7 @@ def root(request: Request): # pylint: disable=W0613
                         "description": "Forbidden."
                     }
                 })
-@limiter.limit("100/minute")
+@limiter.limit("300/minute")
 def login(
     request: Request,
     user: UserDto,

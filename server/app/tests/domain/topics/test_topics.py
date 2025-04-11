@@ -4,6 +4,8 @@ Test cases for the MOMTopicManager class
 
 from app.adapters.db import Database
 from app.adapters.factory import ObjectFactory
+import redis
+import os
 
 import json
 import pytest
@@ -23,6 +25,38 @@ def clear_redis():
     client.flushdb()  # Before test
     yield
     client.flushdb()  # After test
+
+REDIS2_CONFIG = {
+    'host': 'localhost',
+    'port': 6380,
+    'password': os.getenv('REDIS_PASSWORD'),
+    'decode_responses': True
+}
+
+def create_redis2_connection():
+    """Crea y retorna una conexión a redis2"""
+    try:
+        r = redis.Redis(**REDIS2_CONFIG)
+        if r.ping():
+            print("Conexión exitosa a redis2")
+            return r
+        raise ConnectionError("No se pudo conectar a redis2")
+    except redis.AuthenticationError:
+        print("Error de autenticación. Verifica la contraseña")
+        return None
+    except redis.ConnectionError:
+        print("No se pudo conectar a redis2. Verifica si el servicio está corriendo")
+        return None
+    finally:
+        r.close()
+
+@pytest.fixture(autouse=True)
+def create_redis2_connection_fixture():
+    """Fixture to provide a connection to redis2"""
+    db = create_redis2_connection()
+    db.flushdb()
+    yield db
+    db.flushdb()
 
 
 @pytest.fixture(name="redis_connection")
@@ -60,8 +94,9 @@ def user_managers_fixture(redis_connection):
 def test_unsubscribe_creator_form_his_topic(topic_manager):
     """Test unsubscribing the creator from his topic"""
     topic_name = "test_topic"
-    topic = topic_manager.create_topic(topic_name)
+    topic = topic_manager.create_topic(topic_name=topic_name)
     
+    print("data oif response {topic.success} {topic.status} {topic.details}")
     assert topic is not None
     assert topic.success == True
     assert topic.status == MOMTopicStatus.TOPIC_CREATED
@@ -236,7 +271,7 @@ def test_delete_topic(topic_manager, redis_connection):
     assert result is not None
     assert result.success == True
     assert result.status == MOMTopicStatus.TOPIC_DELETED
-    assert result.details == f"Topic test_topic deleted successfully"
+    assert result.details == f"Topic deleted successfully"
 
     status1 = redis_connection.exists(TopicKeyBuilder.metadata_key(topic_name))
     status2 = redis_connection.exists(TopicKeyBuilder.subscribers_key(topic_name))
@@ -579,7 +614,7 @@ def test_multiple_publishers_and_consumers(redis_connection, topic_manager, user
     assert result.details["messages_in_queue"] == total_messages
     
     # Step 6: Run cleanup and verify no messages were deleted
-    # (since all subscribers have consumed their messages but messages remain for record)
+    # (since all subscribers have co nsumed their messages but messages remain for record)
     deleted_count = topic_manager._cleanup_processed_messages(topic_name)
     
     # All subscribers have read their messages, so the minimum offset should be the total count

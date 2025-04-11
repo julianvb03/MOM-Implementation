@@ -33,7 +33,9 @@ class TopicValidator:
                 f"Topic {topic_name} does not exist",
             )
 
-        return TopicOperationResult(True, MOMTopicStatus.TOPIC_EXISTS, "Topic exists")  # pylint: disable=C0301
+        return TopicOperationResult(
+            True, MOMTopicStatus.TOPIC_EXISTS, "Topic exists"
+        )  # pylint: disable=C0301
 
     def validate_user_subscribed(self, topic_name: str) -> TopicOperationResult:
         """

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - redis-network
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+
+  redis_users:
+    image: redis:alpine
+    container_name: redis_users
+    restart: always
+    ports:
+      - "8001:6379"
+    volumes:
+      - redis_users_data:/data
+    networks:
+      - redis-network
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_USERS_PASSWORD}
+
+volumes:
+  redis_data:
+    driver: local
+  redis_users_data:
+    driver: local
+
+networks:
+  redis-network:
+    driver: bridge
