@@ -63,3 +63,4 @@ __pycache__/
 # Environment variables
 .env
 .env.production
+.env.local

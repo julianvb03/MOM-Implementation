@@ -85,8 +85,15 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
 │   ├── __init__.py # API initialization. \
 │   └── app.py # API routes and methods. \
 ├── .env.example # Environment variables example. \
+├── .pylintrc # Pylint configuration file. \
+├── .gitignore # Files to ignore when pushing to the repo. \
+├── Endpoints.md # Endpoints documentation file. \
 ├── README.md # Folder or Service README. \
 ├── Dockerfile # File to build the docker image. \
+├── Dockerfile.grpc # File to build the gRPC docker image. \
+├── docker-compose-dev.yml # Docker compose file for development. \
+├── docker-compose.yml # Docker compose file for production. \
+├── .env # Environment variables file. which is not included in the repo, you need to create it. \
 ├── .dockerignore # Files to ignore when building the docker image. \
 └── requirements.txt # Python dependencies. \
 ```
