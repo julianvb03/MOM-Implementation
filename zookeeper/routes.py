@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from zookeeper.zk_utils import get_redis_connection
+from zookeeper.zk_registry import register_queue_or_topic, get_queue_topic_info
 import json
 
 router = APIRouter(prefix="/zookeeper", tags=["Zookeeper"])
@@ -11,19 +12,19 @@ def list_registered_nodes():
     redis = get_redis_connection()
     try:
         nodes = redis.smembers("zookeeper:nodes")
-        return {"nodes": [n.decode() for n in nodes]}
+        return {"nodes": list(nodes)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/topics")
-def get_topics_and_assignments():
-    """Return topic assignments stored in Redis."""
+@router.get("/queue_topic")
+def get_queue_topic_registry():
+    """Return queue/topic assignments stored in Redis."""
     redis = get_redis_connection()
     try:
-        topics = redis.hgetall("zookeeper:topics")
-        decoded = {k.decode(): v.decode() for k, v in topics.items()}
-        return {"topics": decoded}
+        entries = redis.hgetall("zookeeper:queue_topic_registry")
+        decoded = {k: json.loads(v) for k, v in entries.items()}
+        return {"registry": decoded}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -36,21 +37,48 @@ def get_all_logs():
         keys = redis.keys("log:*")
         logs = {}
         for key in keys:
-            key_str = key.decode()
-            entries = redis.lrange(key_str, 0, -1)
-            logs[key_str] = [json.loads(e.decode()) for e in entries]
+            entries = redis.lrange(key, 0, -1)
+            logs[key] = [json.loads(e) for e in entries]
         return {"logs": logs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/logs/{node_id}")
-def get_logs_for_node(node_id: str):
-    """Return logs for a specific MOM node (e.g. mom-1)."""
-    redis = get_redis_connection()
+@router.post("/queue_topic/registry")
+def register_queue_topic(payload: dict = Body(...)):
+    """
+    Register or delete a queue or topic in the registry.
+
+    Example payload:
+    {
+        "name": "my_topic",
+        "type": "topic",
+        "operation": "create",
+        "origin_node": "A",
+        "replica_nodes": ["B", "C"]
+    }
+    """
     try:
-        key = f"log:{node_id}"
-        entries = redis.lrange(key, 0, -1)
-        return {"node": node_id, "logs": [json.loads(e.decode()) for e in entries]}
+        register_queue_or_topic(
+            name=payload["name"],
+            type_=payload["type"],
+            operation=payload["operation"],
+            origin_node=payload["origin_node"],
+            replica_nodes=payload["replica_nodes"]
+        )
+        return {"status": "success", "registry": payload}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/queue_topic/registry/{name}")
+def get_queue_topic_assignment(name: str):
+    """Return a specific queue/topic registry entry."""
+    try:
+        info = get_queue_topic_info(name)
+        if info:
+            return {"queue_or_topic": name, "info": info}
+        else:
+            raise HTTPException(status_code=404, detail=f"Not found: {name}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
