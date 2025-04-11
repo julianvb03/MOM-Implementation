@@ -51,7 +51,7 @@ class RedisDatabase(Database):
         try:
             self._client.ping()
         except RedisConnectionError:
-            self._reconnect(attempt=attempt + 1)
+            self._reconnect(attempt=attempt)
 
         return self._client
 
@@ -77,7 +77,7 @@ class RedisDatabase(Database):
                 + f":{self._port} after {self._max_retries} attempts."
             )
         self.close()
-        self.get_client()
+        self.get_client(attempt=attempt + 1)
 
     def close(self) -> None:
         """
