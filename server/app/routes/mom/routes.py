@@ -80,7 +80,8 @@ def subscribe(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
             result = manager.subscriptions.subscribe(
-                queue_name=queue_topic.name
+                queue_name=queue_topic.name,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -90,7 +91,8 @@ def subscribe(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
             result = manager.subscriptions.subscribe(
-                topic_name=queue_topic.name
+                topic_name=queue_topic.name,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -179,7 +181,8 @@ def unsubscribe(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
             result = manager.subscriptions.unsubscribe(
-                queue_name=queue_topic.name
+                queue_name=queue_topic.name,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -189,7 +192,8 @@ def unsubscribe(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
             result = manager.subscriptions.unsubscribe(
-                topic_name=queue_topic.name
+                topic_name=queue_topic.name,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -278,7 +282,8 @@ def send_message(
             )
             result = manager.enqueue(
                 queue_name=message_queue_topic.name,
-                message=message_queue_topic.message
+                message=message_queue_topic.message,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -289,7 +294,8 @@ def send_message(
             )
             result = manager.publish(
                 topic_name=message_queue_topic.name,
-                message=message_queue_topic.message
+                message=message_queue_topic.message,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -378,7 +384,8 @@ def receive_message(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
             result = manager.dequeue(
-                queue_name=queue_topic.name
+                queue_name=queue_topic.name,
+                endpoint=True
             )
             success = result.success
             message = result.details
@@ -388,7 +395,8 @@ def receive_message(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
             result = manager.consume(
-                topic_name=queue_topic.name
+                topic_name=queue_topic.name,
+                endpoint=True
             )
             success = result.success
             message = result.details

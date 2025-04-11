@@ -75,7 +75,10 @@ def create_queue_topic(
             manager = MOMQueueManager(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
-            result = manager.create_queue(queue_name=queue_topic.name)
+            result = manager.create_queue(
+                queue_name=queue_topic.name,
+                endpoint=True
+            )
             success = result.success
             message = result.details
             details = result.status.value
@@ -83,7 +86,10 @@ def create_queue_topic(
             manager = MOMTopicManager(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
-            result = manager.create_topic(topic_name=queue_topic.name)
+            result = manager.create_topic(
+                topic_name=queue_topic.name,
+                endpoint=True
+            )
             success = result.success
             message = result.details
             details = result.status.value
@@ -174,7 +180,10 @@ def delete_queue_topic(
             manager = MOMQueueManager(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
-            result = manager.delete_queue(queue_name=queue_topic.name)
+            result = manager.delete_queue(
+                queue_name=queue_topic.name,
+                endpoint=True
+            )
             success = result.success
             message = result.details
             details = result.status.value
@@ -182,7 +191,10 @@ def delete_queue_topic(
             manager = MOMTopicManager(
                 redis_connection=db_manager.get_client(), user=auth["username"]
             )
-            result = manager.delete_topic(topic_name=queue_topic.name)
+            result = manager.delete_topic(
+                topic_name=queue_topic.name,
+                endpoint=True
+            )
             success = result.success
             message = result.details
             details = result.status.value
