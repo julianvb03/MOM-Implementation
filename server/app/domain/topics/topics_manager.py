@@ -16,6 +16,8 @@ from app.domain.topics.topics_validator import TopicValidator
 from app.domain.topics.topics_replication import TopicReplicationClient
 from app.domain.replication_clients import get_replica_client_stub, get_source_client_stub
 from app.domain.models import NODES_CONFIG, WHOAMI
+from app.adapters.factory import ObjectFactory
+from app.adapters.db import Database
 
 class MOMTopicManager:
     """
@@ -26,13 +28,14 @@ class MOMTopicManager:
 
     def __init__(self, redis_connection, user: str):
         self.redis = redis_connection
+        self.redis_backup = db = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE)
         self.user = user
         self.subscriptions = TopicSubscriptionService(self.redis, self.user)
         self.validator = TopicValidator(self.redis, user)
 
         # Obtener los stubs de replicación
-        replica_stub = get_replica_client_stub()
-        source_stub = get_source_client_stub()
+        replica_stub = get_source_client_stub()
+        source_stub = get_replica_client_stub()
 
         current_node_config = NODES_CONFIG[WHOAMI]
         replica_node = current_node_config["whoreplica"]
@@ -50,7 +53,8 @@ class MOMTopicManager:
         )
 
     def create_topic(
-            self, topic_name: str, principal = True, created_at = None
+            self, topic_name: str, principal = True, created_at = None,
+            endpoint: bool = False
                      ) -> TopicOperationResult:
         """
         Create a new topic with the specified name.
@@ -60,7 +64,8 @@ class MOMTopicManager:
             principal node.
             created_at (float): The timestamp of the topic creation 
             (if is not principal).
-
+            endpoint (bool): Whether the topic is an endpoint
+                if True, the topic will be created in the backup.
         Returns:
             TopicOperationResult: Result of the topic creation operation.
         """
@@ -121,6 +126,12 @@ class MOMTopicManager:
                                 replication_result=False
                             )
 
+                        if endpoint:
+                            # Realizar todas las operaciones en el backup
+                            self.redis_backup.hset(metadata_key, mapping=metadata)
+                            self.redis_backup.sadd(subscribers_key, self.user)
+                            self.redis_backup.hsetnx(offset_key, offset_field, 0)
+
                         return TopicOperationResult(
                             success=True,
                             status=MOMTopicStatus.TOPIC_CREATED,
@@ -141,7 +152,8 @@ class MOMTopicManager:
 
     def publish(
             self, message: str, topic_name: str,
-            timestamp = None, im_replicating = False
+            timestamp = None, im_replicating = False,
+            endpoint: bool = False
             ) -> TopicOperationResult:
         """
         Publish a string message to the specified topic.
@@ -150,7 +162,7 @@ class MOMTopicManager:
             topic_name (str): The name of the topic to publish to.
             timestamp (float): The timestamp of the message.
             im_replicating (bool): Whether the publish is being replicated.
-
+            endpoint (bool): Whether the topic is an endpoint
         Returns:
             TopicOperationResult: Result of the publish operation.
         """
@@ -185,6 +197,11 @@ class MOMTopicManager:
                 metadata_key = TopicKeyBuilder.metadata_key(topic_name)
                 pipe.hincrby(metadata_key, "message_count", 1)
                 pipe.execute()
+
+                if endpoint:
+                    # Realizar todas las operaciones en el backup
+                    self.redis_backup.rpush(messages_key, json.dumps(full_message))
+                    self.redis_backup.hincrby(metadata_key, "message_count", 1)
 
                 # Replicar publicación del mensaje
                 # Para saber si el nodo es principal o replicante se
@@ -247,7 +264,8 @@ class MOMTopicManager:
             )
 
     def consume(
-            self, topic_name: str, self_consume: bool = False
+            self, topic_name: str, self_consume: bool = False,
+            endpoint: bool = False
             ) -> TopicOperationResult:
         """
         Consume string messages from a topic based on the subscriber's current
@@ -350,6 +368,10 @@ class MOMTopicManager:
 
             result = self.redis.eval(lua_script, 3, *keys, self.user)
 
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.eval(lua_script, 3, *keys, self.user)
+
             # Validar si soy el mom principal para este topico
             result_principal = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
 
@@ -446,7 +468,8 @@ class MOMTopicManager:
             )
 
     def _cleanup_processed_messages(
-        self, topic_name: str, force_cleanup_by_time: bool = False
+        self, topic_name: str, force_cleanup_by_time: bool = False,
+        endpoint: bool = False
     ) -> int:
         """
         Clean up messages that have been processed by all subscribers or
@@ -455,8 +478,9 @@ class MOMTopicManager:
         Args:
             topic_name (str): The name of the topic to clean up.
             force_cleanup_by_time (bool): Whether to force cleanup based on time 
-                        even if some subscribers haven't read the messages.
-
+                even if some subscribers haven't read the messages.
+            endpoint (bool): Whether the topic is an endpoint
+                if True, the topic will be cleaned up in the backup.
         Returns:
             int: Number of messages deleted from the topic.
         """
@@ -545,6 +569,17 @@ class MOMTopicManager:
                 persistency_time
             )
 
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.eval(
+                    lua_script,
+                    3,
+                    messages_key,
+                    offset_key,
+                    metadata_key,
+                    str(force_cleanup_by_time).lower(),
+                    persistency_time
+                )
             logger.info("Cleaned up %d messages from topic '%s'", deleted, topic_name) # pylint: disable=C0301
             return deleted
 
@@ -608,7 +643,8 @@ class MOMTopicManager:
             )
 
     def delete_topic(
-        self, topic_name: str, principal = True
+        self, topic_name: str, principal = True,
+        endpoint: bool = False
     ) -> TopicOperationResult:
         """
         Delete the specified topic and all its messages.
@@ -646,6 +682,10 @@ class MOMTopicManager:
                 pipe.delete(*keys)
 
                 pipe.execute()  # Borrado atómico
+
+                if endpoint:
+                    # Realizar todas las operaciones en el backup
+                    self.redis_backup.delete(*keys)
 
                 if principal is True:
                     replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301

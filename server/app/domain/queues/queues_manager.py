@@ -14,6 +14,9 @@ from app.domain.queues.queues_validator import QueueValidator
 from app.domain.queue_replication_clients import get_source_queue_client, get_target_queue_client
 from app.domain.models import NODES_CONFIG, WHOAMI
 from app.domain.queues.queues_replication import QueueReplicationClient
+from app.adapters.factory import ObjectFactory
+from app.adapters.db import Database
+
 class MOMQueueManager:
     """
     This class handles the management of message queues in a Redis database,
@@ -27,13 +30,14 @@ class MOMQueueManager:
 
     def __init__(self, redis_connection, user: str):
         self.redis = redis_connection
+        self.redis_backup = db = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE)
         self.user = user
         self.subscriptions = SubscriptionService(self.redis, self.user)
         self.validator = QueueValidator(self.redis, user)
 
         # Obtener los stubs de replicación
-        replica_stub = get_target_queue_client()
-        source_stub = get_source_queue_client()
+        replica_stub = get_source_queue_client()
+        source_stub = get_target_queue_client()
 
         current_node_config = NODES_CONFIG[WHOAMI]
         replica_node = current_node_config["whoreplica"]
@@ -52,7 +56,8 @@ class MOMQueueManager:
 
     def create_queue(
         self, queue_name: str, message_limit: int = 1000,
-        principal: bool = True, created_at: str = None
+        principal: bool = True, created_at: str = None,
+        endpoint: bool = False
     ) -> QueueOperationResult:
         """
         Create a new queue with the specified name and message limit.
@@ -60,15 +65,18 @@ class MOMQueueManager:
             queue_name (str): The name of the queue to create.
             message_limit (int): The maximum number of messages 
                 allowed in the queue.
+            endpoint (bool): Whether the queue is an endpoint
+                if True, the queue will be created in the backup.
         Returns:
             QueueOperationResult: Result of the queue creation operation.
         """
         try:
             if not 1 <= message_limit <= (2**32 - 1):
                 return QueueOperationResult(
-                    False,
-                    MOMQueueStatus.INVALID_ARGUMENTS,
-                    "Message limit out of valid range",
+                    success=False,
+                    status=MOMQueueStatus.INVALID_ARGUMENTS,
+                    details="Message limit out of valid range",
+                    replication_result=False
                 )
 
             queue_key = KeyBuilder.queue_key(queue_name)
@@ -97,6 +105,15 @@ class MOMQueueManager:
             if result.success is False:
                 self.redis.delete(metadata_key, queue_key)
                 return result
+            
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                subscribers_key = KeyBuilder.subscribers_key(queue_name)
+                # Crear la cola en el backup
+                self.redis_backup.hset(metadata_key, mapping=metadata)
+                # Subscribirse al backup
+                self.redis_backup.sadd(subscribers_key, self.user)
+            
 
             # Replication
             if principal:
@@ -128,7 +145,8 @@ class MOMQueueManager:
 
     def enqueue(self, message: str, queue_name: str,
                 uuid: str = None, timestamp = None,
-                im_replicating = False) -> QueueOperationResult:
+                im_replicating = False, endpoint: bool = False
+                ) -> QueueOperationResult:
         """
         Enqueue a message to the specified queue.
         Args:
@@ -136,6 +154,8 @@ class MOMQueueManager:
             queue_name (str): The name of the queue to enqueue the message to.
             uuid (str): The UUID of the message.
             timestamp (float): The timestamp of the message.
+            endpoint (bool): Whether the queue is an endpoint
+                if True, the message will be enqueued in the backup.
         Returns:
             QueueOperationResult: Result of the enqueue operation.
         """
@@ -189,6 +209,11 @@ class MOMQueueManager:
                         timestamp=timestamp
                     )
 
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.rpush(queue_key, json.dumps(full_message))
+                self.redis_backup.hincrby(metadata_key, "total_messages", 1)
+
             return QueueOperationResult(
                 success=True,
                 status=MOMQueueStatus.SUCCES_OPERATION,
@@ -205,7 +230,8 @@ class MOMQueueManager:
             )
 
     def dequeue(
-        self, queue_name: str, uuid: str = None, im_replicating: bool = False
+        self, queue_name: str, uuid: str = None, im_replicating: bool = False,
+        endpoint: bool = False
     ) -> QueueOperationResult:
         """
         Dequeue a message from the specified queue.
@@ -242,6 +268,10 @@ class MOMQueueManager:
                         message_to_dequeue = msg_data
                         # Eliminar el mensaje específico
                         self.redis.lrem(queue_key, 1, msg)
+
+                        if endpoint:
+                            # Realizar todas las operaciones en el backup
+                            self.redis_backup.lrem(queue_key, 1, msg)
                         break
 
                 if not message_to_dequeue:
@@ -254,6 +284,10 @@ class MOMQueueManager:
             else:
                 # Caso de pop normal
                 message_json = self.redis.lpop(queue_key)
+                if endpoint:
+                    # Realizar todas las operaciones en el backup
+                    self.redis_backup.lpop(queue_key)
+
                 if not message_json:
                     return QueueOperationResult(
                         success=True,
@@ -264,6 +298,9 @@ class MOMQueueManager:
                 message_to_dequeue = json.loads(message_json)
 
             self.redis.hincrby(metadata_key, "total_messages", -1)
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.hincrby(metadata_key, "total_messages", -1)
 
             # Replicación
             replication_result = True
@@ -293,7 +330,10 @@ class MOMQueueManager:
         except Exception as e: # pylint: disable=W0718
             logger.exception("Error dequeueing from  '%s'",queue_name)
             return QueueOperationResult(
-                False, MOMQueueStatus.INTERNAL_ERROR, str(e)
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details=str(e),
+                replication_result=False
             )
 
     def get_queue_info(self, queue_name: str) -> QueueOperationResult:
@@ -328,11 +368,13 @@ class MOMQueueManager:
                 False, MOMQueueStatus.INTERNAL_ERROR, str(e)
             )
 
-    def delete_queue(self, queue_name: str) -> QueueOperationResult:
+    def delete_queue(self, queue_name: str, endpoint: bool = False) -> QueueOperationResult:
         """
         Delete the specified queue and its metadata.
         Args:
             queue_name (str): The name of the queue to delete.
+            endpoint (bool): Whether the queue is an endpoint
+                if True, the queue will be deleted from the backup.
         Returns:
             QueueOperationResult: Result of the queue deletion operation.
         """
@@ -350,7 +392,10 @@ class MOMQueueManager:
                 return result
 
             principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
-            self.redis.delete(queue_key, metadata_key, subscribers_key)
+            self.redis.delete(queue_key, metadata_key, subscribers_key) 
+            if endpoint:
+                self.redis_backup.delete(queue_key, metadata_key, subscribers_key)
+
             if principal:
                 result = self.replication_client.delete_queue(
                     queue_name=queue_name,
