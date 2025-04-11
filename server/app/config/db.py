@@ -23,9 +23,12 @@ class RedisDatabase(Database):
         self._password = password
         self._max_retries = 3
 
-    def get_client(self) -> Redis:
+    def get_client(self, attempt: int = 1) -> Redis:
         """
         Get the shared Redis client with connection pool
+        
+        Args:
+            attempt (int): Current attempt number to connect
         
         Returns:
             Redis: Redis client instance
@@ -48,7 +51,7 @@ class RedisDatabase(Database):
         try:
             self._client.ping()
         except RedisConnectionError:
-            self._reconnect(attempt=1)
+            self._reconnect(attempt=attempt + 1)
 
         return self._client
 
