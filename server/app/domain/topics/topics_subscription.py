@@ -17,6 +17,8 @@ from app.domain.replication_clients import (
     get_replica_client_stub,
     get_source_client_stub,
 )
+from app.adapters.factory import ObjectFactory
+from app.adapters.db import Database
 
 
 class TopicSubscriptionService:
@@ -25,6 +27,7 @@ class TopicSubscriptionService:
     """
     def __init__(self, redis, user: str):
         self.redis = redis
+        self.redis_backup = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE).get_client()
         self.user = user
         self.validator = TopicValidator(redis, user)
 
@@ -44,7 +47,7 @@ class TopicSubscriptionService:
             stub=source_stub, target_node_desc=f"nodo principal ({WHOAMI})"
         )
 
-    def subscribe(self, topic_name: str) -> TopicOperationResult:
+    def subscribe(self, topic_name: str, endpoint: bool = False) -> TopicOperationResult:
         try:
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
@@ -79,6 +82,12 @@ class TopicSubscriptionService:
 
             self.redis.hset(offset_key, offset_field, initial_offset)
 
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.sadd(subscribers_key, self.user)
+                self.redis_backup.hset(offset_key, offset_field, initial_offset)
+
+
             # Replicar la suscripción según el rol del nodo
             replication_op = False
             if principal:
@@ -106,7 +115,7 @@ class TopicSubscriptionService:
                 replication_result=False,
             )
 
-    def unsubscribe(self, topic_name: str) -> TopicOperationResult:
+    def unsubscribe(self, topic_name: str, endpoint: bool = False) -> TopicOperationResult:
         try:
             result = self.validator.validate_topic_exists(topic_name)
             if not result.success:
@@ -141,6 +150,11 @@ class TopicSubscriptionService:
             offset_key = TopicKeyBuilder.subscriber_offsets_key(topic_name)
             offset_field = TopicKeyBuilder.subscriber_offset_field(self.user)
             self.redis.hdel(offset_key, offset_field)
+
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.srem(subscribers_key, self.user)
+                self.redis_backup.hdel(offset_key, offset_field)
 
             # Replicar la desuscripción según el rol del nodo
             replication_op = False

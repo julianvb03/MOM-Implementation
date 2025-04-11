@@ -14,7 +14,8 @@ from app.domain.queue_replication_clients import (
 )
 from app.domain.models import NODES_CONFIG, WHOAMI
 from app.domain.queues.queues_replication import QueueReplicationClient
-
+from app.adapters.factory import ObjectFactory
+from app.adapters.db import Database
 
 class SubscriptionService:
     """
@@ -25,6 +26,7 @@ class SubscriptionService:
     def __init__(self, redis, user: str):
         self.redis = redis
         self.user = user
+        self.redis_backup = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE).get_client()
         self.validator = QueueValidator(redis, user)
 
         # Obtener los stubs de replicación
@@ -44,7 +46,7 @@ class SubscriptionService:
             stub=source_stub, target_node_desc=f"nodo principal ({WHOAMI})"
         )
 
-    def subscribe(self, queue_name: str) -> QueueOperationResult:
+    def subscribe(self, queue_name: str, endpoint: bool = False) -> QueueOperationResult:
         """
         Subscribe the user to a queue.
         Args:
@@ -66,6 +68,10 @@ class SubscriptionService:
 
             subscribers_key = KeyBuilder.subscribers_key(queue_name)
             self.redis.sadd(subscribers_key, self.user)
+
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.sadd(subscribers_key, self.user)
 
             # Verificar si soy el nodo principal para este queue
             metadata_key = KeyBuilder.metadata_key(queue_name)
@@ -101,7 +107,7 @@ class SubscriptionService:
                 replication_result=False,
             )
 
-    def unsubscribe(self, queue_name: str) -> QueueOperationResult:
+    def unsubscribe(self, queue_name: str, endpoint: bool = False) -> QueueOperationResult:
         """
         Unsubscribe the user from a queue.
         Args:
@@ -128,6 +134,10 @@ class SubscriptionService:
 
             subscribers_key = KeyBuilder.subscribers_key(queue_name)
             self.redis.srem(subscribers_key, self.user)
+
+            if endpoint:
+                # Realizar todas las operaciones en el backup
+                self.redis_backup.srem(subscribers_key, self.user)
 
             # Verificar si soy el nodo principal para este queue
             metadata_key = KeyBuilder.metadata_key(queue_name)
