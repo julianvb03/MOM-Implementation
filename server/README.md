@@ -115,22 +115,31 @@ This is a REST API for the implementation of a MOM middleware for the Topics of 
 
 ## Docker Image
 
-### Image Build
-
-The access is private, so you need to ask for the access to the docker image in the ghcr.io registry. `ghcr.io/juanfeliperestrepobuitrago/momtet/mom_server_api:latest`.
-
-1. **Navigate to the Backend Directory**: navigate to the BACKEND directory `cd BACKEND`.
-2. **Build an image**: Create or build the image of the backend API with your docker hub user `docker build -t "$USER/$PROJECT_NAME:$API_NAME.v$API_VERSION" . --no-cache --network host` or without it `docker build -t "$PROJECT_NAME:$API_NAME.v$API_VERSION" . --no-cache --network host`.
-3. **Push the image (Optional)**: Push the docker image you just created to docker hub, is optional. `sudo docker push "$USER/$PROJECT_NAME:$API_NAME.v$API_VERSION"`.
-
 ### Image Usage
 
-#### Docker Image
+We didn't upload the docker image to any registry, so you need to build it locally. The developer mode run only has the databases necessary to execute the API and the API itself. The production mode has the API, the database of MOM and the gRPC image execution (For production you need the other 2 mongo IPs, the backup database and the users database).
 
-For using the docker image, you can run the following command:
+- To run in developer mode you can run the following command in the root directory of the project:
 
 ```bash
-docker run -d -p 8000:8000 --env-file .env ${USER}/mom_server_api:${TAG}
+docker compose -f ./docker-compose-dev.yml up -d --build
+```
+
+To stop the docker containers, you can run the following command:
+
+```bash
+docker compose -f ./docker-compose-dev.yml down
+```
+
+- To run in production mode you can run the following command in the root directory of the project:
+
+```bash
+docker compose -f ./docker-compose.yml up -d --build
+```
+To stop the docker containers, you can run the following command:
+
+```bash
+docker compose -f ./docker-compose.yml down
 ```
 
 ## Endpoints

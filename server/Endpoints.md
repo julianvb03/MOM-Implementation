@@ -279,6 +279,10 @@ A protected endpoint requiring admin authentication, returns a welcome message f
 #### **Description**
 Subscribes an authenticated user to a queue or topic in the message broker.
 
+#### **Limiter**
+
+- **Rate Limit**: 200 requests per minute. It was configured with the limiter.py file.
+
 ---
 
 #### **Request Data**
@@ -363,6 +367,10 @@ Subscribes an authenticated user to a queue or topic in the message broker.
 #### **Description**
 Unsubscribes an authenticated user from a queue or topic in the message broker.
 
+#### **Limiter**
+
+- **Rate Limit**: 200 requests per minute. It was configured with the limiter.py file.
+
 ---
 
 #### **Request Data**
@@ -446,6 +454,10 @@ Unsubscribes an authenticated user from a queue or topic in the message broker.
 
 #### **Description**
 Sends a message to a queue or topic in the message broker by an authenticated user.
+
+#### **Limiter**
+
+- **Rate Limit**: 200 requests per minute. It was configured with the limiter.py file.
 
 ---
 
@@ -532,6 +544,10 @@ Sends a message to a queue or topic in the message broker by an authenticated us
 
 #### **Description**
 Receives a message from a queue or topic in the message broker for an authenticated user.
+
+#### **Limiter**
+
+- **Rate Limit**: 200 requests per minute. It was configured with the limiter.py file.
 
 ---
 
@@ -787,6 +803,10 @@ Creates a new user in the system (admin-only).
 #### **Description**
 Creates a new queue or topic in the message broker (admin-only).
 
+#### **Limiter**
+
+- **Rate Limit**: 100 requests per minute. It was configured with the limiter.py file.
+
 ---
 
 #### **Request Data**
@@ -870,6 +890,10 @@ Creates a new queue or topic in the message broker (admin-only).
 
 #### **Description**
 Deletes a queue or topic from the message broker by name (admin-only).
+
+#### **Limiter**
+
+- **Rate Limit**: 100 requests per minute. It was configured with the limiter.py file.
 
 ---
 
