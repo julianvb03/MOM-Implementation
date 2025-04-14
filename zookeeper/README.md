@@ -1,217 +1,256 @@
-# 🦡 Zookeeper API - Message-Oriented Middleware
+# 🦡 Zookeeper API – Message-Oriented Middleware (MOM)
 
-This microservice coordinates the creation and assignment of queues and topics in a distributed MOM (Message-Oriented Middleware) system. It also allows node registration, failure simulation, and tracking of MOM node health.
+This microservice is responsible for coordinating queues and topics within a distributed MOM system. It manages node registration, assignment tracking, node health, and failure simulation.
 
 ---
 
-## 🧩 Technologies Used
+## 🚀 Technologies Used
 
 - **FastAPI**
 - **Redis**
 - **Docker (optional)**
-- **JSON for data exchange**
-- **Authentication via MomServer (JWT-based)**
+- **JSON-based communication**
+- **No authentication required (token handled externally by MomServer)**
 
 ---
 
-## 📦 Available Endpoints
+## 🌐 Base URL
 
-### 1. 🚀 Create Queue or Topic
-
-Registers a new queue or topic, with origin node and replicas.
-
-```http
-POST /queue_topic/registry
 ```
-
-#### Payload:
-```json
-{
-  "name": "demo_queue",
-  "type": "queue", // or "topic"
-  "operation": "create",
-  "origin_node": "mom-a",
-  "replica_nodes": ["mom-b", "mom-c"]
-}
-```
-
-#### Response:
-```json
-{
-  "status": "success",
-  "registry": {
-    ...
-  }
-}
+http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper
 ```
 
 ---
 
-### 2. ❌ Delete Queue or Topic
-
-Deletes a queue/topic assignment.
-
-```http
-DELETE /queue_topic/registry
-```
-
-#### Payload:
-```json
-{
-  "name": "demo_queue",
-  "type": "queue"
-}
-```
-
----
-
-### 3. 📚 List All Registry Entries
-
-```http
-GET /queue_topic
-```
-
----
-
-### 4. 📄 Get Registry Info by Name
-
-```http
-GET /queue_topic/registry/{name}
-```
-
----
-
-### 5. 🧠 Get Nodes that Have a Queue/Topic
-
-```http
-GET /queue_topic/assigned_nodes?name=demo_queue&type=queue
-```
-
----
-
-### 6. 🧭 List Active MOM Nodes
-
-```http
-GET /nodes
-```
-
----
-
-### 7. ❤️ Check Node Health
-
-```http
-GET /node/health?node=mom-a
-```
-
----
-
-### 8. 📜 View System Logs
-
-```http
-GET /logs
-```
-
----
-
-### 9. 📦 Get Assignments of a Node (by path)
-
-```http
-GET /registry/node/{node_id}
-```
-
----
-
-### 10. 📦 Get Assignments of a Node (by query param)
-
-```http
-GET /node/assignments?node=mom-local
-```
-
----
-
-## ⚙️ Internal Redis Keys
-
-- `zookeeper:queue_topic_registry`
-- `zookeeper:node:{node_id}`
-- `zookeeper:nodes`
-- `log:*`
-
----
-
-## 🧪 CURL Test Examples
-
-```bash
-# Create queue
-curl -X POST http://localhost:8100/queue_topic/registry -H "Content-Type: application/json" -d '{
-  "name": "queue_demo",
-  "type": "queue",
-  "operation": "create",
-  "origin_node": "mom-a",
-  "replica_nodes": ["mom-b", "mom-c"]
-}'
-
-# Check which nodes have it
-curl "http://localhost:8100/queue_topic/assigned_nodes?name=queue_demo&type=queue"
-
-# Delete queue
-curl -X DELETE http://localhost:8100/queue_topic/registry -H "Content-Type: application/json" -d '{
-  "name": "queue_demo",
-  "type": "queue"
-}'
-
-# Check node assignments
-curl http://localhost:8100/registry/node/mom-a
-
-# Check node health
-curl http://localhost:8100/node/health?node=mom-a
-```
-
----
-
-## 🛠️ .env.example
+## 📁 .env.example
 
 ```env
-# Basic info
-API_NAME=MomServer
-API_VERSION=v1.0.0
-JWT_SECRET=mysupersecret
-
-# Redis
+# Redis configuration
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=strongpassword123*
 
-# MOM Node Info
+# Node identity
 NODE_ID=mom-local
 NODE_HOST=http://localhost:8000
 
-# Optional: For discovery or logging
-GRPC_PORT=50051
-
-# Zookeeper
+# Zookeeper instance
 ZOOKEEPER_HOST=localhost
 ZOOKEEPER_PORT=2181
 ```
 
 ---
 
-## ▶️ How to Run
+## 🧠 How It Works
 
-1. Create a virtual environment and install dependencies:
+- Uses Redis to store queue/topic assignments and node metadata.
+- Registers queues/topics under: `zookeeper:queue_topic_registry`
+- Stores node-specific assignments under: `zookeeper:node:{NODE_ID}`
+- Tracks active nodes in: `zookeeper:nodes`
+- Logs events under keys like: `log:events`
+
+---
+
+## 📦 Endpoints
+
+### 1. Register Queue or Topic
+
+**POST** `/queue_topic/registry`
+
+Registers a queue or topic with origin and replica nodes.
+
+#### Request Body
+```json
+{
+  "name": "queue_demo",
+  "type": "queue", // or "topic"
+  "operation": "create",
+  "origin_node": "mom-local",
+  "replica_nodes": ["mom-b", "mom-c"]
+}
+```
+
+#### Response
+```json
+{
+  "status": "success",
+  "registry": { ... }
+}
+```
+
+---
+
+### 2. Delete Queue or Topic
+
+**DELETE** `/queue_topic/registry`
+
+#### Request Body
+```json
+{
+  "name": "queue_demo",
+  "type": "queue"
+}
+```
+
+#### Response
+```json
+{
+  "status": "success",
+  "message": "Assignment removed"
+}
+```
+
+---
+
+### 3. Get All Queue/Topic Registry
+
+**GET** `/queue_topic`
+
+Returns all stored queue/topic assignments.
+
+---
+
+### 4. Get Specific Queue/Topic Info
+
+**GET** `/queue_topic/registry/{name}`
+
+Example:
+```
+/queue_topic/registry/queue_demo
+```
+
+---
+
+### 5. Get Nodes Assigned to a Queue/Topic
+
+**GET** `/queue_topic/assigned_nodes?name=queue_demo&type=queue`
+
+Returns a list of node IDs that hold the given queue/topic.
+
+---
+
+### 6. List All Active Nodes
+
+**GET** `/nodes`
+
+Returns all nodes currently marked as active in the registry.
+
+---
+
+### 7. Check Node Health
+
+**GET** `/node/health?node=mom-local`
+
+Returns:
+```json
+{
+  "node": "mom-local",
+  "alive": true
+}
+```
+
+---
+
+### 8. View Node Assignments (Query Param)
+
+**GET** `/node/assignments?node=mom-local`
+
+---
+
+### 9. View Node Assignments (Path Param)
+
+**GET** `/registry/node/{node_id}`
+
+Example:
+```
+/registry/node/mom-local
+```
+
+---
+
+### 10. View System Logs
+
+**GET** `/logs`
+
+Returns Redis-stored logs, e.g.:
+```json
+{
+  "logs": {
+    "log:events": [
+      {
+        "timestamp": "2025-04-14 15:21:21",
+        "node": "mom-1",
+        "message": "✅ Node registered"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 11. Simulate Node Failure (for testing)
+
+**POST** `/zk/failure/{node_id}`
+
+Example:
+```
+POST /zk/failure/mom-local
+```
+
+Response:
+```json
+{
+  "status": "node_failure_logged",
+  "node": "mom-local"
+}
+```
+
+---
+
+## 🧪 Testing with cURL
+
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Register a new queue
+curl -X POST http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/queue_topic/registry   -H "Content-Type: application/json"   -d '{
+    "name": "queue_demo",
+    "type": "queue",
+    "operation": "create",
+    "origin_node": "mom-local",
+    "replica_nodes": ["mom-b"]
+  }'
+
+# List all nodes
+curl http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/nodes
+
+# Get queue assignments
+curl http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/queue_topic
+
+# Get node-specific assignments
+curl http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/registry/node/mom-local
+
+# Delete queue
+curl -X DELETE http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/queue_topic/registry   -H "Content-Type: application/json"   -d '{"name": "queue_demo", "type": "queue"}'
+
+# Simulate failure
+curl -X POST http://localhost:8100/zk/failure/mom-local
 ```
 
-2. Export your environment variables or create a `.env` file.
+---
 
-3. Run the API:
-```bash
-uvicorn app.main:app --reload --port 8100
-```
+## ✅ Status Codes
 
-4. Test with `curl` or Swagger UI at:
-```
-http://localhost:8100/docs
-```
+| Code | Meaning                |
+|------|------------------------|
+| 200  | OK                     |
+| 400  | Bad Request            |
+| 404  | Not Found              |
+| 500  | Internal Server Error  |
+
+---
+
+## 📌 Notes
+
+- All operations are **stateless**, stored in Redis.
+- Can be integrated directly into FastAPI's admin panel via Swagger.
+- Works **independently** of authentication, relying on other microservices (e.g., `MomServer`) to manage users and tokens.
