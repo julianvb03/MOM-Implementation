@@ -6,10 +6,6 @@
 - [Project Structure](#project-structure)
 - [Pre-requisites](#pre-requisites)
 - [Setup Instructions](#setup-instructions)
-- [Docker Image](#docker-image)
-  - [Image Build](#image-build)
-  - [Image Usage](#image-usage)
-- [Endpoints](#endpoints)
 - [Contribution](#contribution)
 - [Contact](#contact)
 
