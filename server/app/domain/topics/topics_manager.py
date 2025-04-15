@@ -15,6 +15,7 @@ from app.domain.topics.topics_subscription import TopicSubscriptionService
 from app.domain.topics.topics_validator import TopicValidator
 from app.domain.topics.topics_replication import TopicReplicationClient
 from app.domain.replication_clients import get_replica_client_stub, get_source_client_stub
+from app.domain.queue_replication_clients import SOURCE_QUEUE_NODE_ID
 from app.domain.models import NODES_CONFIG, WHOAMI
 from app.adapters.factory import ObjectFactory
 from app.adapters.db import Database
@@ -29,6 +30,7 @@ class MOMTopicManager:
     def __init__(self, redis_connection, user: str):
         self.redis = redis_connection
         self.redis_backup = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE).get_client()
+        self.redis_nodes = ObjectFactory.get_instance(Database, ObjectFactory.NODES_DATABASE).get_client()
         self.user = user
         self.subscriptions = TopicSubscriptionService(self.redis, self.user)
         self.validator = TopicValidator(self.redis, user)
@@ -117,6 +119,17 @@ class MOMTopicManager:
                                 topic_name, self.user, created_at
                             )
 
+                        if endpoint:
+                            # Realizar todas las operaciones en el backup
+                            self.redis_backup.hset(metadata_key, mapping=metadata)
+                            self.redis_backup.sadd(subscribers_key, self.user)
+                            self.redis_backup.hsetnx(offset_key, offset_field, 0)
+
+                            #Decir en que nodos se debe crear
+                            self.redis_nodes.sadd(WHOAMI, f"topic:{topic_name}")
+                            self.redis_nodes.sadd(SOURCE_QUEUE_NODE_ID, f"topic:{topic_name}")
+                            logger.info(f"Topic {topic_name} created in {SOURCE_QUEUE_NODE_ID} and {WHOAMI}")
+
                         if principal and replication_op is False:
                             # Descartar la transacción si la replicación falla
                             return TopicOperationResult(
@@ -125,12 +138,6 @@ class MOMTopicManager:
                                 details=f"Topic {topic_name} created successfully",
                                 replication_result=False
                             )
-
-                        if endpoint:
-                            # Realizar todas las operaciones en el backup
-                            self.redis_backup.hset(metadata_key, mapping=metadata)
-                            self.redis_backup.sadd(subscribers_key, self.user)
-                            self.redis_backup.hsetnx(offset_key, offset_field, 0)
 
                         return TopicOperationResult(
                             success=True,
@@ -686,7 +693,12 @@ class MOMTopicManager:
                 if endpoint:
                     # Realizar todas las operaciones en el backup
                     self.redis_backup.delete(*keys)
+                    # Decir en cuales nodos ya no existe el topico
+                    self.redis_nodes.srem(WHOAMI, f"topic:{topic_name}")
+                    self.redis_nodes.srem(SOURCE_QUEUE_NODE_ID, f"topic:{topic_name}")
+                    logger.info(f"Topic {topic_name} deleted in {SOURCE_QUEUE_NODE_ID} and {WHOAMI}")
 
+                replication_operation = False
                 if principal is True:
                     replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301
                         topic_name=topic_name,
