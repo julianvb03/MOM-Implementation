@@ -8,7 +8,7 @@ services:
     env_file:
       - .env
     ports:
-      - "6379:6379"
+      - "8002:6379"
     networks:
       - redis-network
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
