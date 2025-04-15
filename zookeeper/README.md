@@ -167,31 +167,56 @@ curl http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/zookeeper/regist
 ## ⚙️ .env.example
 
 ```env
-# API basic configuration
+# ========================
+# 🔧 API Basic Configuration
+# ========================
 API_NAME=MomServer                  # Name of the main MOM API service
 API_VERSION=v1.0.0                  # Current version of the API
 
-# Redis configuration (used to store queues, topics, nodes, logs, etc.)
-REDIS_HOST=localhost                # Address of the Redis server (usually localhost or container name)
-REDIS_PORT=6379                     # Port where Redis is listening (default is 6379)
-REDIS_PASSWORD=strongpassword123*   # Password to access Redis (change this in production)
+# ========================
+# 🧠 Redis Configuration
+# ========================
+REDIS_HOST=localhost                # Redis host (localhost or container name)
+REDIS_PORT=6379                     # Redis default port
+REDIS_PASSWORD=strongpassword123*   # Redis password (change in production)
 
-# Default internal admin user (used for initial setup or tests)
-DEFAULT_USER_NAME=admin             # Default admin username
-DEFAULT_USER_PASSWORD=123           # Default admin password
+# ========================
+# 👤 Default Internal Admin User
+# ========================
+DEFAULT_USER_NAME=admin             # Initial admin username
+DEFAULT_USER_PASSWORD=123           # Initial admin password
 
-# Zookeeper settings (optional future use)
-ZOOKEEPER_HOST=zookeeper            # Hostname or alias where Zookeeper is running
-ZOOKEEPER_PORT=2181                 # Port used by Zookeeper (default is 2181)
+# ========================
+# 🐘 Zookeeper Settings
+# ========================
+ZOOKEEPER_HOST=zookeeper            # Hostname or container name of the Zookeeper service
+ZOOKEEPER_PORT=2181                 # Default Zookeeper port
 
-# Cluster node configuration
-NODE_A_IP=localhost                 # IP address or hostname of node A
-NODE_B_IP=localhost                 # IP address or hostname of node B
-NODE_C_IP=localhost                 # IP address or hostname of node C
-GRPC_PORT=50051                     # Port used for gRPC communication between MOM nodes
+# ========================
+# 🌐 MOM Cluster Node IPs
+# ========================
+NODE_A_IP=172.31.85.206             # IP address of Node A
+NODE_B_IP=172.31.93.141             # IP address of Node B
+NODE_C_IP=172.31.80.53              # IP address of Node C
+GRPC_PORT=50051                     # Port used for gRPC communication between nodes
 
-# Node identification
-WHOAMI=mom-local                    # Unique identifier for the current MOM node
+# ========================
+# 🆔 Node Runtime Identity (Set individually before running each node)
+# ========================
+# These must be overridden at runtime or in individual env files per node
+
+# NODE_ID=mom-a                     # Unique internal ID for the node
+# NODE_HOST=http://172.31.85.206:8000  # Public HTTP host of this node
+# WHOAMI=mom-a                      # Logical name of the node (used in logs, assignments, etc.)
+
+# ========================
+# ▶️ Example Run Commands Per Node (Optional)
+# ========================
+# 👉 Run this manually depending on the node
+# NODE_ID=mom-a NODE_HOST=http://172.31.85.206:8000 WHOAMI=mom-a uvicorn app.main:app --host 0.0.0.0 --port 8000
+# NODE_ID=mom-b NODE_HOST=http://172.31.93.141:8000 WHOAMI=mom-b uvicorn app.main:app --host 0.0.0.0 --port 8000
+# NODE_ID=mom-c NODE_HOST=http://172.31.80.53:8000 WHOAMI=mom-c uvicorn app.main:app --host 0.0.0.0 --port 8000
+
 
 ```
 
