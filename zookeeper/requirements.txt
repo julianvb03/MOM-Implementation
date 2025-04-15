@@ -4,3 +4,4 @@ redis==5.0.3
 python-dotenv==1.0.1
 pydantic==2.7.0
 httpx==0.27.0          # For HTTP
+kazoo==0.10.1          # For Zookeeper
