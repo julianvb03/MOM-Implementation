@@ -5,12 +5,12 @@ It includes a function to initialize the database with default values.
 from app.auth.auth import auth_handler
 from app.adapters.db import Database
 from app.adapters.factory import ObjectFactory
-from app.config.env import DEFAULT_USER_PASSWORD, DEFAULT_USER_NAME
+from app.config.env import DEFAULT_USER_PASSWORD, DEFAULT_USER_NAME, WHOAMI
 from app.dtos.admin.mom_management_dto import QueueTopic
 from app.exceptions.database_exceptions import DatabaseConnectionError
 from app.models.user import User, UserRole
 from typing import List
-
+import time
 
 def initialize_database():
     """
@@ -38,6 +38,24 @@ def initialize_database():
     # Set Redis configurations
     client.config_set("maxmemory", "256mb")
     client.config_set("maxmemory-policy", "allkeys-lru")
+
+
+def get_elements_from_db() -> List[QueueTopic]:
+    """
+    Function to get all the elements from the database.
+    """
+    db = ObjectFactory.get_instance(Database, ObjectFactory.NODES_DATABASE)
+    client = db.get_client()
+    if not client:
+        raise DatabaseConnectionError("Database client not initialized")
+
+    keys = client.smembers(WHOAMI)
+    elements = []
+    for key in keys:
+        name = key.split(":")[1]
+        type_ = key.split(":")[0]
+        elements.append(QueueTopic(name=name, type=type_))
+    return elements
 
 
 def generate_keys(name: str, type_: str) -> List[str]:
@@ -76,6 +94,9 @@ def backup_database(elements: List[QueueTopic]):
 
     if not client or not backup_client:
         raise DatabaseConnectionError("Database client not initialized")
+    
+    # Clean the client database
+    client.flushdb()
 
     for element in elements:
         keys = generate_keys(element.name, element.type.value)

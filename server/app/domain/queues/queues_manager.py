@@ -11,7 +11,7 @@ from app.domain.logger_config import logger
 from app.domain.utils import KeyBuilder
 from app.domain.queues.queues_subscription import SubscriptionService
 from app.domain.queues.queues_validator import QueueValidator
-from app.domain.queue_replication_clients import get_source_queue_client, get_target_queue_client
+from app.domain.queue_replication_clients import get_source_queue_client, get_target_queue_client, SOURCE_QUEUE_NODE_ID
 from app.domain.models import NODES_CONFIG, WHOAMI
 from app.domain.queues.queues_replication import QueueReplicationClient
 from app.adapters.factory import ObjectFactory
@@ -31,6 +31,7 @@ class MOMQueueManager:
     def __init__(self, redis_connection, user: str):
         self.redis = redis_connection
         self.redis_backup = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE).get_client()
+        self.redis_nodes = ObjectFactory.get_instance(Database, ObjectFactory.NODES_DATABASE).get_client()
         self.user = user
         self.subscriptions = SubscriptionService(self.redis, self.user)
         self.validator = QueueValidator(self.redis, user)
@@ -113,6 +114,10 @@ class MOMQueueManager:
                 self.redis_backup.hset(metadata_key, mapping=metadata)
                 # Subscribirse al backup
                 self.redis_backup.sadd(subscribers_key, self.user)
+
+                # Replicar la creación de la cola
+                self.redis_nodes.sadd(WHOAMI, f"queue:{queue_name}")
+                self.redis_nodes.sadd(SOURCE_QUEUE_NODE_ID, f"queue:{queue_name}")
             
 
             # Replication
@@ -395,6 +400,8 @@ class MOMQueueManager:
             self.redis.delete(queue_key, metadata_key, subscribers_key) 
             if endpoint:
                 self.redis_backup.delete(queue_key, metadata_key, subscribers_key)
+                self.redis_nodes.srem(WHOAMI, f"queue:{queue_name}")
+                self.redis_nodes.srem(SOURCE_QUEUE_NODE_ID, f"queue:{queue_name}")
 
             if principal:
                 result = self.replication_client.delete_queue(

@@ -8,7 +8,8 @@ from app.config.db import RedisDatabase
 from app.config.env import (
     REDIS_HOST, REDIS_PORT, REDIS_PASSWORD,
     REDIS_USERS_HOST, REDIS_USERS_PORT, REDIS_USERS_PASSWORD,
-    REDIS_BACKUP_HOST, REDIS_BACKUP_PORT, REDIS_BACKUP_PASSWORD
+    REDIS_BACKUP_HOST, REDIS_BACKUP_PORT, REDIS_BACKUP_PASSWORD,
+    REDIS_NODES_HOST, REDIS_NODES_PORT, REDIS_NODES_PASSWORD
 )
 from app.repositories.user_repository import UserRepositoryRedis
 from app.services.user_service import UserServiceImpl
@@ -22,6 +23,7 @@ class ObjectFactory:
     USERS_DATABASE = "UsersDatabase"
     MOM_DATABASE = "MomDatabase"
     BACK_UP_DATABASE = "BackUpDatabase"
+    NODES_DATABASE = "NodesDatabase"
 
     @staticmethod
     def get_instance(interface: type, db_type: str = None) -> object:
@@ -52,6 +54,12 @@ class ObjectFactory:
                     host=REDIS_BACKUP_HOST,
                     port=REDIS_BACKUP_PORT,
                     password=REDIS_BACKUP_PASSWORD
+                )
+            elif db_type == ObjectFactory.NODES_DATABASE:
+                instance = RedisDatabase(
+                    host=REDIS_NODES_HOST,
+                    port=REDIS_NODES_PORT,
+                    password=REDIS_NODES_PASSWORD
                 )
             else:
                 instance = RedisDatabase(
