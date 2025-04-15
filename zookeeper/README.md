@@ -167,24 +167,32 @@ curl http://localhost:8100/api/v1.0.0/MomServer/admin/zookeeper/zookeeper/regist
 ## ⚙️ .env.example
 
 ```env
-API_NAME=MomServer
-API_VERSION=v1.0.0
+# API basic configuration
+API_NAME=MomServer                  # Name of the main MOM API service
+API_VERSION=v1.0.0                  # Current version of the API
 
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=strongpassword123*
+# Redis configuration (used to store queues, topics, nodes, logs, etc.)
+REDIS_HOST=localhost                # Address of the Redis server (usually localhost or container name)
+REDIS_PORT=6379                     # Port where Redis is listening (default is 6379)
+REDIS_PASSWORD=strongpassword123*   # Password to access Redis (change this in production)
 
-DEFAULT_USER_NAME=admin
-DEFAULT_USER_PASSWORD=123
+# Default internal admin user (used for initial setup or tests)
+DEFAULT_USER_NAME=admin             # Default admin username
+DEFAULT_USER_PASSWORD=123           # Default admin password
 
-ZOOKEEPER_HOST=zookeeper
-ZOOKEEPER_PORT=2181
+# Zookeeper settings (optional future use)
+ZOOKEEPER_HOST=zookeeper            # Hostname or alias where Zookeeper is running
+ZOOKEEPER_PORT=2181                 # Port used by Zookeeper (default is 2181)
 
-NODE_A_IP=localhost
-NODE_B_IP=localhost
-NODE_C_IP=localhost
-GRPC_PORT=50051
-WHOAMI=mom-local
+# Cluster node configuration
+NODE_A_IP=localhost                 # IP address or hostname of node A
+NODE_B_IP=localhost                 # IP address or hostname of node B
+NODE_C_IP=localhost                 # IP address or hostname of node C
+GRPC_PORT=50051                     # Port used for gRPC communication between MOM nodes
+
+# Node identification
+WHOAMI=mom-local                    # Unique identifier for the current MOM node
+
 ```
 
 ---
