@@ -396,25 +396,23 @@ class MOMQueueManager:
             if result.success is False:
                 return result
 
-            principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
             self.redis.delete(queue_key, metadata_key, subscribers_key) 
             if endpoint:
                 self.redis_backup.delete(queue_key, metadata_key, subscribers_key)
                 self.redis_nodes.srem(WHOAMI, f"queue:{queue_name}")
                 self.redis_nodes.srem(SOURCE_QUEUE_NODE_ID, f"queue:{queue_name}")
 
-            if principal:
-                result = self.replication_client.delete_queue(
-                    queue_name=queue_name,
-                    owner=self.user
+            result = self.replication_client.delete_queue(
+                queue_name=queue_name,
+                owner=self.user
+            )
+            if result is False:
+                return QueueOperationResult(
+                    success=True,
+                    status=MOMQueueStatus.INTERNAL_ERROR,
+                    details="Queue deleted successfully, but replication failed", # pylint: disable=C0301
+                    replication_result=False
                 )
-                if result is False:
-                    return QueueOperationResult(
-                        success=True,
-                        status=MOMQueueStatus.INTERNAL_ERROR,
-                        details="Queue deleted successfully, but replication failed", # pylint: disable=C0301
-                        replication_result=False
-                    )
 
             # Replication
             return QueueOperationResult(
