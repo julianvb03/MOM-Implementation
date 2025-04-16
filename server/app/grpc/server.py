@@ -427,7 +427,6 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
     def QueueReplicateSubscribe(self, request, context):
         try:
             db = create_redis2_connection()
-            logger.critical("DB: %s", db)
             if db is None:
                 context.set_code(grpc.StatusCode.UNAVAILABLE)
                 context.set_details("Redis connection failed")
@@ -440,11 +439,7 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
             # Obtener la clave correcta de suscriptores
             subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
             queue_key = KeyBuilder.metadata_key(request.queue_name)
-            logger.critical("Subscribers key: %s", subscribers_key)
-            logger.critical("Queue key: %s", queue_key)
-
             # Verificar si la cola existe
-            logger.critical("Existe la cola: %s", db.exists(queue_key))
             if not db.exists(queue_key):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Queue does not exist")
@@ -455,7 +450,6 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 )
 
             # Verificar si el usuario ya está suscrito
-            logger.critical("Existe el usuario: %s", db.sismember(subscribers_key, request.requester))
             if db.sismember(subscribers_key, request.requester):
                 context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                 context.set_details("User is already subscribed to this queue")

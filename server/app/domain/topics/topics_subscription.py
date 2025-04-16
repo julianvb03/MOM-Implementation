@@ -32,8 +32,8 @@ class TopicSubscriptionService:
         self.validator = TopicValidator(redis, user)
 
         # Obtener los stubs de replicación
-        replica_stub = get_replica_client_stub()
-        source_stub = get_source_client_stub()
+        replica_stub = get_source_client_stub()
+        source_stub = get_replica_client_stub()
 
         # Obtener la configuración del nodo actual
         current_node_config = NODES_CONFIG[WHOAMI]
