@@ -327,7 +327,7 @@ class QueueReplicationClient:
             return QueueOperationResult(
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details="No se pudo obtener el stub del nodo"
+                details="Cannot forward unsubscribe to node"
             )
 
         try:
@@ -343,7 +343,7 @@ class QueueReplicationClient:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details=message_data.get("details", "Desuscripción realizada correctamente")
+                        details=message_data.get("details", "Successfully unsubscribed from queue")
                     )
                 except json.JSONDecodeError:
                     return QueueOperationResult(

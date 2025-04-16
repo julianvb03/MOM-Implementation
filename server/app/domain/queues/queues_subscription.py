@@ -27,6 +27,7 @@ class SubscriptionService:
         self.redis = redis
         self.user = user
         self.redis_backup = ObjectFactory.get_instance(Database, ObjectFactory.BACK_UP_DATABASE).get_client()
+        self.redis_nodes = ObjectFactory.get_instance(Database, ObjectFactory.NODES_DATABASE).get_client()
         self.validator = QueueValidator(redis, user)
 
         # Obtener los stubs de replicación
