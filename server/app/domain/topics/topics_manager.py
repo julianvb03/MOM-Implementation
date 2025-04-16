@@ -184,14 +184,14 @@ class MOMTopicManager:
                 # validar si soy el mom principal para este topico
                 result = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
                 principal = bool(int(result))
-                logger.critical("Soy el mom principal para este topico: %s", principal) # pylint: disable=C0301
+                #logger.critical("Soy el mom principal para este topico: %s", principal) # pylint: disable=C0301
 
                 # Preparar mensaje
-                if principal and timestamp is None:
+                if timestamp is None:
                     timestamp = datetime.now().timestamp()
                 else:
                     timestamp = float(timestamp)
-                logger.critical("timestamp: %s", timestamp)
+                #logger.critical("timestamp: %s", timestamp)
                 full_message = {
                     "timestamp": timestamp,
                     "publisher": self.user,
