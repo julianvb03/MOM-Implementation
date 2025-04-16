@@ -99,6 +99,7 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
             metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
             subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
             offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
+            messages_key = TopicKeyBuilder.messages_key(request.topic_name)
 
             # Verificar si el tópico existe
             if not db.exists(metadata_key):
@@ -111,7 +112,7 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 )
 
             # Eliminar todas las claves relacionadas con el tópico
-            db.delete(topic_key, metadata_key, subscribers_key, offset_key)
+            db.delete(topic_key, metadata_key, subscribers_key, offset_key, messages_key)
 
             return ReplicationResponse(
                 success=True,
