@@ -699,10 +699,16 @@ class MOMTopicManager:
                     logger.info(f"Topic {topic_name} deleted in {SOURCE_QUEUE_NODE_ID} and {WHOAMI}")
 
                 replication_operation = False
-                replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301
-                    topic_name=topic_name,
-                    owner=self.user
-                )
+                if principal is True:
+                    replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301
+                        topic_name=topic_name,
+                        owner=self.user
+                    )
+                else:
+                    replication_operation = self.replication_principal.replicate_delete_topic( # pylint: disable=C0301
+                        topic_name=topic_name,
+                        owner=self.user
+                    )
 
                 if replication_operation is False:
                     return TopicOperationResult(
