@@ -282,7 +282,7 @@ class MOMQueueManager:
                 result.replication_result = False
                 return result
             
-            
+
             result = self.validator.validate_user_subscribed(queue_name)
             if result.success is False:
                 result.replication_result = False
