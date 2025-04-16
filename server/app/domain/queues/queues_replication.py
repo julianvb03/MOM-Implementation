@@ -221,11 +221,12 @@ class QueueReplicationClient:
                     details="Error enqueueing message"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_enqueue")
             return QueueOperationResult(    
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
 
     def forward_dequeue(self, queue_name: str, user: str, node: str) -> QueueOperationResult:
@@ -268,11 +269,12 @@ class QueueReplicationClient:
                     details="Error dequeueing message"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_dequeue")
             return QueueOperationResult(
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
         
     def forward_subscribe(self, queue_name: str, user: str, node: str) -> QueueOperationResult:
@@ -313,11 +315,12 @@ class QueueReplicationClient:
                     details="Error subscribing to queue"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_subscribe")
             return QueueOperationResult(    
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
         
     def forward_unsubscribe(self, queue_name: str, user: str, node: str) -> QueueOperationResult:
@@ -358,9 +361,10 @@ class QueueReplicationClient:
                     details="Error unsubscribing from queue"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_unsubscribe")
             return QueueOperationResult(    
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )

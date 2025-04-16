@@ -301,10 +301,11 @@ class TopicReplicationClient:
                 )
         except Exception as e:
             logger.exception("Error en forward_subscribe")
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             return TopicOperationResult(    
                 success=False,
                 status=MOMTopicStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
         
     def forward_unsubscribe(self, topic_name: str, user: str, node: str) -> TopicOperationResult:
@@ -345,15 +346,16 @@ class TopicReplicationClient:
                     details="Error unsubscribing from topic"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_unsubscribe")
             return TopicOperationResult(    
                 success=False,
                 status=MOMTopicStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
 
     def forward_publish(self, topic_name: str, user: str, message: str, node: str) -> TopicOperationResult:
-        topic_stub, _ = get_node_stubs(node)
+        _ , topic_stub = get_node_stubs(node)
 
         if not topic_stub:
             return TopicOperationResult(
@@ -391,15 +393,16 @@ class TopicReplicationClient:
                     details="Error publishing message"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_publish")
             return TopicOperationResult(    
                 success=False,
                 status=MOMTopicStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
             
     def forward_consume(self, topic_name: str, user: str, node: str) -> TopicOperationResult:
-        topic_stub, _ = get_node_stubs(node)
+        _ , topic_stub = get_node_stubs(node)
 
         if not topic_stub:
             return TopicOperationResult(
@@ -436,9 +439,10 @@ class TopicReplicationClient:
                     details="Error consuming message"
                 )
         except Exception as e:
+            error_message = e.details() if hasattr(e, 'details') else str(e)
             logger.exception("Error en forward_consume")
             return TopicOperationResult(    
                 success=False,
                 status=MOMTopicStatus.INTERNAL_ERROR,
-                details=str(e)
+                details=error_message
             )
