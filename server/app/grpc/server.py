@@ -388,7 +388,6 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
             topic_manager = MOMTopicManager(db, request.subscriber)
             result = topic_manager.consume(
                 topic_name=request.topic_name,
-                im_replicating=False,
                 endpoint=True
             )
 
