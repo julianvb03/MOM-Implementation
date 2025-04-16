@@ -261,7 +261,7 @@ class TopicReplicationClient:
             return False
 
     def forward_subscribe(self, topic_name: str, user: str, node: str) -> TopicOperationResult:
-        topic_stub, _ = get_node_stubs(node)
+        _ , topic_stub = get_node_stubs(node)
 
         if not topic_stub:
             return TopicOperationResult(
@@ -306,7 +306,7 @@ class TopicReplicationClient:
             )
         
     def forward_unsubscribe(self, topic_name: str, user: str, node: str) -> TopicOperationResult:
-        topic_stub, _ = get_node_stubs(node)
+        _ , topic_stub = get_node_stubs(node)
 
         if not topic_stub:
             return TopicOperationResult(
