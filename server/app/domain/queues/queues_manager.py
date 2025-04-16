@@ -170,19 +170,39 @@ class MOMQueueManager:
 
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                # Verificamos si la cola existe en algún nodo usando SMEMBERS
                 nodes = ["A", "B", "C"]
-                nodes.remove(WHOAMI)
+                queue_exists_somewhere = False
+                target_nodes = []
 
                 for node in nodes:
-                    result = self.replication_client.forward_enqueue(
-                        queue_name=queue_name,
-                        user=self.user,
-                        message=message,
-                        node=node
+                    # Verificamos si "queue:queue_name" está en el set del nodo
+                    members = self.redis_nodes.smembers(node)
+                    if f"queue:{queue_name}" in members:
+                        queue_exists_somewhere = True
+                        target_nodes.append(node)
+
+                if not queue_exists_somewhere:
+                    return QueueOperationResult(
+                        success=False,
+                        status=MOMQueueStatus.QUEUE_NOT_EXIST,
+                        details="La cola no existe en ningún nodo",
+                        replication_result=False
                     )
-                    if result.success:
-                        return result
-                    
+
+                # Si la cola existe en algún nodo, intentamos el forward
+                nodes.remove(WHOAMI)
+                for node in nodes:
+                    if node in target_nodes:  # Solo intentamos forward a nodos donde sabemos que existe la cola
+                        result = self.replication_client.forward_enqueue(
+                            queue_name=queue_name,
+                            user=self.user,
+                            message=message,
+                            node=node
+                        )
+                        if result.success:
+                            return result
+                        
                 result.success = False
                 result.replication_result = False
                 return result
@@ -266,18 +286,38 @@ class MOMQueueManager:
         try:
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                # Verificamos si la cola existe en algún nodo usando SMEMBERS
                 nodes = ["A", "B", "C"]
-                nodes.remove(WHOAMI)
+                queue_exists_somewhere = False
+                target_nodes = []
 
                 for node in nodes:
-                    result = self.replication_client.forward_dequeue(
-                        queue_name=queue_name,
-                        user=self.user,
-                        node=node
+                    # Verificamos si "queue:queue_name" está en el set del nodo
+                    members = self.redis_nodes.smembers(node)
+                    if f"queue:{queue_name}" in members:
+                        queue_exists_somewhere = True
+                        target_nodes.append(node)
+
+                if not queue_exists_somewhere:
+                    return QueueOperationResult(
+                        success=False,
+                        status=MOMQueueStatus.QUEUE_NOT_EXIST,
+                        details="La cola no existe en ningún nodo",
+                        replication_result=False
                     )
-                    if result.success:
-                        return result
-                
+
+                # Si la cola existe en algún nodo, intentamos el forward
+                nodes.remove(WHOAMI)
+                for node in nodes:
+                    if node in target_nodes:  # Solo intentamos forward a nodos donde sabemos que existe la cola
+                        result = self.replication_client.forward_dequeue(
+                            queue_name=queue_name,
+                            user=self.user,
+                            node=node
+                        )
+                        if result.success:
+                            return result
+
                 result.success = False
                 result.replication_result = False
                 return result
