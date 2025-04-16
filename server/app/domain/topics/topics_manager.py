@@ -677,6 +677,9 @@ class MOMTopicManager:
                     result.success = False
                     result.replication_result = False
                     return result
+                
+                metadata_key = TopicKeyBuilder.metadata_key(topic_name)
+                principal = bool(int(self.redis.hget(metadata_key, "original_node")))
 
                 # Eliminar en transacción
                 pipe.multi()
@@ -699,7 +702,6 @@ class MOMTopicManager:
                     logger.info(f"Topic {topic_name} deleted in {SOURCE_QUEUE_NODE_ID} and {WHOAMI}")
 
                 replication_operation = False
-                principal = bool(int(self.redis.hget(keys[0], "original_node"))) # pylint: disable=C0301
                 if principal is True:
                     replication_operation = self.replication_client.replicate_delete_topic( # pylint: disable=C0301
                         topic_name=topic_name,
