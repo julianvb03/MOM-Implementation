@@ -18,6 +18,7 @@ from app.grpc.replication_service_pb2 import (
 from app.grpc.replication_service_pb2_grpc import QueueReplicationStub
 from app.domain.utils import get_node_stubs
 from app.domain.models import QueueOperationResult, MOMQueueStatus
+import json
 
 class QueueReplicationClient:
     """Client for topic replication via gRPC"""
@@ -194,26 +195,38 @@ class QueueReplicationClient:
                 message=message,
             )
             response = queue_stub.QueueReplicateForwardEnqueue(request)
+            # Aquí está el cambio clave - verificamos el mensaje de la respuesta
             if response.success:
-                return QueueOperationResult(
-                    success=True,
-                    status=MOMQueueStatus.SUCCESS,
-                    details="Mensaje encolado correctamente"
-                )
+                try:
+                    # Intentamos parsear el mensaje como JSON por si viene en ese formato
+                    message_data = json.loads(response.message)
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=message_data.get("details", "Mensaje encolado correctamente")
+                    )
+                except json.JSONDecodeError:
+                    # Si no es JSON, usamos el mensaje directamente
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=response.message
+                    )
             else:
                 return QueueOperationResult(
                     success=False,
                     status=MOMQueueStatus.INTERNAL_ERROR,
-                    details="Error en la encolación del mensaje"
+                    details=response.message
                 )
-        except Exception: # pylint: disable=W0718
+        except Exception as e:
+            logger.exception("Error en forward_enqueue")
             return QueueOperationResult(    
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details="Error en la encolación del mensaje"
+                details=str(e)
             )
 
-    def forward_dequeue(self, queue_name: str, user: str, node: str):
+    def forward_dequeue(self, queue_name: str, user: str, node: str) -> QueueOperationResult:
         queue_stub, _ = get_node_stubs(node)
 
         if not queue_stub:
@@ -229,21 +242,33 @@ class QueueReplicationClient:
                 subscriber=user,
             )
             response = queue_stub.QueueReplicateForwardDequeue(request)
+            # Aquí está el cambio clave - verificamos el mensaje de la respuesta
             if response.success:
-                return QueueOperationResult(
-                    success=True,
-                    status=MOMQueueStatus.SUCCESS,
-                    details=response.message
-                )
+                try:
+                    # Intentamos parsear el mensaje como JSON por si viene en ese formato
+                    message_data = json.loads(response.message)
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=message_data.get("details", "Mensaje desencolado correctamente")
+                    )
+                except json.JSONDecodeError:
+                    # Si no es JSON, usamos el mensaje directamente
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=response.message
+                    )
             else:
                 return QueueOperationResult(
                     success=False,
                     status=MOMQueueStatus.INTERNAL_ERROR,
-                    details="Error en la desencolación del mensaje"
+                    details=response.message
                 )
-        except Exception: # pylint: disable=W0718
+        except Exception as e:
+            logger.exception("Error en forward_dequeue")
             return QueueOperationResult(
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
-                details="Error en la desencolación del mensaje"
+                details=str(e)
             )

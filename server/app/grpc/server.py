@@ -639,7 +639,7 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
             result = queue_manager.enqueue(
                 message=request.message,
                 queue_name=request.queue_name,
-                im_replicating=True,
+                im_replicating=False,
                 endpoint=True
             )
 
@@ -682,7 +682,7 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
             queue_manager = MOMQueueManager(db, request.subscriber)
             result = queue_manager.dequeue(
                 queue_name=request.queue_name,
-                im_replicating=True,
+                im_replicating=False,
                 endpoint=True
             )
             
