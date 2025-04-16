@@ -15,7 +15,9 @@ from app.grpc.replication_service_pb2 import (
     TopicSubscribeRequest,
     TopicUnsubscribeRequest,
     TopicForwardSubscribeRequest,
-    TopicForwardUnsubscribeRequest
+    TopicForwardUnsubscribeRequest,
+    TopicForwardPublishMessageRequest,
+    TopicForwardConsumeMessageRequest
 )
 from app.grpc.replication_service_pb2_grpc import TopicReplicationStub
 from app.domain.models import TopicOperationResult, MOMTopicStatus
@@ -283,19 +285,19 @@ class TopicReplicationClient:
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.SUBSCRIPTION_CREATED,
-                        details=message_data.get("details", "Suscripción realizada correctamente")
+                        details=message_data.get("details", "Successfully subscribed to topic")
                     )
                 except json.JSONDecodeError:
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.SUBSCRIPTION_CREATED,
-                        details=response.message
+                        details="Error subscribing to topic"
                     )
             else:
                 return TopicOperationResult(
                     success=False,
                     status=MOMTopicStatus.INTERNAL_ERROR,
-                    details=response.message
+                    details="Error subscribing to topic"
                 )
         except Exception as e:
             logger.exception("Error en forward_subscribe")
@@ -328,22 +330,113 @@ class TopicReplicationClient:
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.SUBSCRIPTION_DELETED,
-                        details=message_data.get("details", "Desuscripción realizada correctamente")
+                        details=message_data.get("details", "Successfully unsubscribed from topic")
                     )
                 except json.JSONDecodeError:
                     return TopicOperationResult(
                         success=True,
                         status=MOMTopicStatus.SUBSCRIPTION_DELETED,
-                        details=response.message
+                        details="Error unsubscribing from topic"
                     )
             else:
                 return TopicOperationResult(
                     success=False,
                     status=MOMTopicStatus.INTERNAL_ERROR,
-                    details=response.message
+                    details="Error unsubscribing from topic"
                 )
         except Exception as e:
             logger.exception("Error en forward_unsubscribe")
+            return TopicOperationResult(    
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details=str(e)
+            )
+
+    def forward_publish(self, topic_name: str, user: str, message: str, node: str) -> TopicOperationResult:
+        topic_stub, _ = get_node_stubs(node)
+
+        if not topic_stub:
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details="Cannot forward publish to node"
+            )
+
+        try:
+            request = TopicForwardPublishMessageRequest(
+                topic_name=topic_name,
+                publisher=user,
+                message=message,
+            )
+            response = topic_stub.TopicReplicateForwardPublishMessage(request)
+            
+            if response.success:
+                try:
+                    message_data = json.loads(response.message)
+                    return TopicOperationResult(
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_PUBLISHED,
+                        details=message_data.get("details", "Message published successfully")
+                    )
+                except json.JSONDecodeError:
+                    return TopicOperationResult(
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_PUBLISHED,
+                        details="Error publishing message"
+                    )
+            else:
+                return TopicOperationResult(
+                    success=False,
+                    status=MOMTopicStatus.INTERNAL_ERROR,
+                    details="Error publishing message"
+                )
+        except Exception as e:
+            logger.exception("Error en forward_publish")
+            return TopicOperationResult(    
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details=str(e)
+            )
+            
+    def forward_consume(self, topic_name: str, user: str, node: str) -> TopicOperationResult:
+        topic_stub, _ = get_node_stubs(node)
+
+        if not topic_stub:
+            return TopicOperationResult(
+                success=False,
+                status=MOMTopicStatus.INTERNAL_ERROR,
+                details="No se pudo obtener el stub del nodo"
+            )
+
+        try:
+            request = TopicForwardConsumeMessageRequest(
+                topic_name=topic_name,
+                subscriber=user,
+            )
+            response = topic_stub.TopicReplicateForwardConsumeMessage(request)
+            
+            if response.success:
+                try:
+                    message_data = json.loads(response.message)
+                    return TopicOperationResult(
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_CONSUMED,
+                        details=message_data.get("details", None)
+                    )
+                except json.JSONDecodeError:
+                    return TopicOperationResult(
+                        success=True,
+                        status=MOMTopicStatus.MESSAGE_CONSUMED,
+                        details="Error consuming message"
+                    )
+            else:
+                return TopicOperationResult(
+                    success=False,
+                    status=MOMTopicStatus.INTERNAL_ERROR,
+                    details="Error consuming message"
+                )
+        except Exception as e:
+            logger.exception("Error en forward_consume")
             return TopicOperationResult(    
                 success=False,
                 status=MOMTopicStatus.INTERNAL_ERROR,

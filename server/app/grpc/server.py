@@ -326,10 +326,99 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
             )
 
     def TopicReplicateForwardPublishMessage(self, request, context):
-        pass
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.publisher)
+            result = topic_manager.publish(
+                message=request.message,
+                topic_name=request.topic_name,
+                im_replicating=False,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully published to topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardPublishMessage")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
 
     def TopicReplicateForwardConsumeMessage(self, request, context):
-        pass
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.subscriber)
+            result = topic_manager.consume(
+                topic_name=request.topic_name,
+                im_replicating=False,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully consumed from topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardConsumeMessage")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
 
     def TopicReplicateForwardSubscribe(self, request, context):
         try:

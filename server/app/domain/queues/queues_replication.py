@@ -212,13 +212,13 @@ class QueueReplicationClient:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details=response.message
+                        details="Error enqueueing message"
                     )
             else:
                 return QueueOperationResult(
                     success=False,
                     status=MOMQueueStatus.INTERNAL_ERROR,
-                    details=response.message
+                    details="Error enqueueing message"
                 )
         except Exception as e:
             logger.exception("Error en forward_enqueue")
@@ -259,13 +259,13 @@ class QueueReplicationClient:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details=response.message
+                        details="Error dequeueing message"
                     )
             else:
                 return QueueOperationResult(
                     success=False,
                     status=MOMQueueStatus.INTERNAL_ERROR,
-                    details=response.message
+                    details="Error dequeueing message"
                 )
         except Exception as e:
             logger.exception("Error en forward_dequeue")
@@ -304,13 +304,13 @@ class QueueReplicationClient:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details=response.message
+                        details="Error subscribing to queue"
                     )
             else:
                 return QueueOperationResult(
                     success=False,
                     status=MOMQueueStatus.INTERNAL_ERROR,
-                    details=response.message
+                    details="Error subscribing to queue"
                 )
         except Exception as e:
             logger.exception("Error en forward_subscribe")
@@ -349,13 +349,13 @@ class QueueReplicationClient:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details=response.message
+                        details="Error unsubscribing from queue"
                     )
             else:
                 return QueueOperationResult(
                     success=False,
                     status=MOMQueueStatus.INTERNAL_ERROR,
-                    details=response.message
+                    details="Error unsubscribing from queue"
                 )
         except Exception as e:
             logger.exception("Error en forward_unsubscribe")
