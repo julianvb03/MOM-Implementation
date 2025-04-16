@@ -404,6 +404,10 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
 
             # Eliminar todas las claves relacionadas con la cola
             db.delete(queue_key, metadata_key, subscribers_key)
+            nodes = ["A", "B", "C"]
+            db_nodes = ObjectFactory.get_instance(Database, ObjectFactory.NODES_DATABASE).get_client()
+            for node in nodes:
+                db_nodes.srem(node, f"queue:{request.queue_name}")
 
             return ReplicationResponse(
                 success=True,
