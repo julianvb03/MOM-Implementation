@@ -181,9 +181,9 @@ class MOMQueueManager:
             #     return result
 
             principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
-            if uuid is not None:
+            if endpoint:
                 uuid = str(uuid_lib.uuid4())
-            if timestamp is not None:
+            if endpoint:
                 timestamp = datetime.now(timezone.utc).timestamp()
 
             full_message = {
