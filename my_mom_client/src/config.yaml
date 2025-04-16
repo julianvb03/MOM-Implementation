@@ -1,5 +1,5 @@
 api_base_url: "http://localhost:8080/api/v1.0.0/MomServer"
 credentials:
-  username: "julian"
+  username: "usuario"
   password: "123"
 timeout: 10  # segundos
