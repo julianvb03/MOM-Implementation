@@ -181,9 +181,9 @@ class MOMQueueManager:
             #     return result
 
             principal = bool(int(self.redis.hget(metadata_key, "original_node"))) # pylint: disable=C0301
-            if principal and uuid is None:
+            if endpoint:
                 uuid = str(uuid_lib.uuid4())
-            if principal and timestamp is None:
+            if endpoint:
                 timestamp = datetime.now(timezone.utc).timestamp()
 
             full_message = {
@@ -402,19 +402,26 @@ class MOMQueueManager:
                 self.redis_backup.delete(queue_key, metadata_key, subscribers_key)
                 self.redis_nodes.srem(WHOAMI, f"queue:{queue_name}")
                 self.redis_nodes.srem(SOURCE_QUEUE_NODE_ID, f"queue:{queue_name}")
-
+            
+            result = False
             if principal:
                 result = self.replication_client.delete_queue(
                     queue_name=queue_name,
                     owner=self.user
                 )
-                if result is False:
-                    return QueueOperationResult(
-                        success=True,
-                        status=MOMQueueStatus.INTERNAL_ERROR,
-                        details="Queue deleted successfully, but replication failed", # pylint: disable=C0301
-                        replication_result=False
-                    )
+            else:
+                result = self.replication_principal.delete_queue(
+                    queue_name=queue_name,
+                    owner=self.user
+                )
+
+            if result is False:
+                return QueueOperationResult(
+                    success=True,
+                    status=MOMQueueStatus.INTERNAL_ERROR,
+                    details="Queue deleted successfully, but replication failed", # pylint: disable=C0301
+                    replication_result=False
+                )
 
             # Replication
             return QueueOperationResult(

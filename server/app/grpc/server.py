@@ -91,13 +91,17 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                        message="Redis connection failed",
+                    message="Redis connection failed",
                 )
-            
-            topic_manager = MOMTopicManager(db, request.requester)
+
+            # Obtener las claves necesarias
+            topic_key = TopicKeyBuilder.topic_key(request.topic_name)
+            metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
+            subscribers_key = TopicKeyBuilder.subscribers_key(request.topic_name)
+            offset_key = TopicKeyBuilder.subscriber_offsets_key(request.topic_name)
+            messages_key = TopicKeyBuilder.messages_key(request.topic_name)
 
             # Verificar si el tópico existe
-            metadata_key = TopicKeyBuilder.metadata_key(request.topic_name)
             if not db.exists(metadata_key):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Topic does not exist")
@@ -107,35 +111,15 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                     message="Topic does not exist",
                 )
 
-            # Solo el nodo principal puede eliminar un tópico
-            if int(db.hget(metadata_key, "original_node")) != 0:
-                context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                context.set_details("Permission denied")
-                return ReplicationResponse(
-                    success=False,
-                    status_code=StatusCode.REPLICATION_FAILED,
-                    message="Permission denied",
-                )
+            # Eliminar todas las claves relacionadas con el tópico
+            db.delete(topic_key, metadata_key, subscribers_key, offset_key, messages_key)
 
-                result = topic_manager.delete_topic(
-                    topic_name=request.topic_name, principal=False
-                )
-
-                if not result.success:
-                    context.set_code(grpc.StatusCode.INTERNAL)
-                    context.set_details(result.status.value)
-                    return ReplicationResponse(
-                        success=False,
-                        status_code=StatusCode.REPLICATION_FAILED,
-                        message=result.status.value,
-                    )
-
-                return ReplicationResponse(
-                    success=True,
-                    status_code=StatusCode.REPLICATION_SUCCESS,
-                    message="Topic replicated successfully",
-                )
-        except Exception as e: # pylint: disable=W0703
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Topic deleted successfully",
+            )
+        except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ReplicationResponse(
@@ -398,24 +382,28 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                     message="Redis connection failed",
                 )
 
-            queue_manager = MOMQueueManager(db, request.requester)
-            result = queue_manager.delete_queue(
-                queue_name=request.queue_name,
-            )
+            # Obtener las claves necesarias
+            queue_key = KeyBuilder.queue_key(request.queue_name)
+            metadata_key = KeyBuilder.metadata_key(request.queue_name)
+            subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
 
-            if not result.success:
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(result.status.value)
+            # Verificar si la cola existe
+            if not db.exists(metadata_key):
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details("Queue does not exist")
                 return ReplicationResponse(
                     success=False,
                     status_code=StatusCode.REPLICATION_FAILED,
-                    message=result.status.value,
+                    message="Queue does not exist",
                 )
+
+            # Eliminar todas las claves relacionadas con la cola
+            db.delete(queue_key, metadata_key, subscribers_key)
 
             return ReplicationResponse(
                 success=True,
                 status_code=StatusCode.REPLICATION_SUCCESS,
-                message="Queue replicated successfully",
+                message="Queue deleted successfully",
             )
         except Exception as e: # pylint: disable=W0703
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -439,7 +427,6 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
             # Obtener la clave correcta de suscriptores
             subscribers_key = KeyBuilder.subscribers_key(request.queue_name)
             queue_key = KeyBuilder.metadata_key(request.queue_name)
-
             # Verificar si la cola existe
             if not db.exists(queue_key):
                 context.set_code(grpc.StatusCode.NOT_FOUND)

@@ -184,14 +184,14 @@ class MOMTopicManager:
                 # validar si soy el mom principal para este topico
                 result = self.redis.hget(TopicKeyBuilder.metadata_key(topic_name), "original_node") # pylint: disable=C0301
                 principal = bool(int(result))
-                logger.critical("Soy el mom principal para este topico: %s", principal) # pylint: disable=C0301
+                #logger.critical("Soy el mom principal para este topico: %s", principal) # pylint: disable=C0301
 
                 # Preparar mensaje
-                if principal and timestamp is None:
+                if timestamp is None:
                     timestamp = datetime.now().timestamp()
                 else:
                     timestamp = float(timestamp)
-                logger.critical("timestamp: %s", timestamp)
+                #logger.critical("timestamp: %s", timestamp)
                 full_message = {
                     "timestamp": timestamp,
                     "publisher": self.user,
@@ -677,6 +677,9 @@ class MOMTopicManager:
                     result.success = False
                     result.replication_result = False
                     return result
+                
+                metadata_key = TopicKeyBuilder.metadata_key(topic_name)
+                principal = bool(int(self.redis.hget(metadata_key, "original_node")))
 
                 # Eliminar en transacción
                 pipe.multi()
@@ -704,14 +707,19 @@ class MOMTopicManager:
                         topic_name=topic_name,
                         owner=self.user
                     )
+                else:
+                    replication_operation = self.replication_principal.replicate_delete_topic( # pylint: disable=C0301
+                        topic_name=topic_name,
+                        owner=self.user
+                    )
 
-                    if replication_operation is False:
-                        return TopicOperationResult(
-                            success=True,
-                            status=MOMTopicStatus.TOPIC_DELETED,
-                            details="Topic deleted successfully, but replication failed",
-                            replication_result=False
-                        )
+                if replication_operation is False:
+                    return TopicOperationResult(
+                        success=True,
+                        status=MOMTopicStatus.TOPIC_DELETED,
+                        details="Topic deleted successfully, but replication failed",
+                        replication_result=False
+                    )
 
                 return TopicOperationResult(
                     success=True,

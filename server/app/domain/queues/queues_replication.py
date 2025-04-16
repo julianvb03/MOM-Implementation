@@ -142,9 +142,7 @@ class QueueReplicationClient:
             request = QueueSubscribeRequest(
                 queue_name=queue_name, requester=user
             ) # pylint: disable=C0301
-
             response = self.stub.QueueReplicateSubscribe(request)
-
             if response.success:
                 return True
             else:
