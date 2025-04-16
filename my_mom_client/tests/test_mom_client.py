@@ -55,6 +55,7 @@ def just_pass_fail(test_name, passed):
         print(f"{RED}[{test_name}] {EMOJI_FAIL} FAILED{RESET}")
 
 # Pruebas
+
 def test_home(client):
     test_name = "Home"
     resp = client.get_home_message()
@@ -80,6 +81,20 @@ def test_login(client):
 def test_subscribe(client, queue_name):
     test_name = "Subscribe"
     response = client.subscribe(queue_name, "queue")
+    if response is None:
+        record_result(test_name, False, error="No response received.")
+        just_pass_fail(test_name, False)
+    elif response.get("success") is True:
+        record_result(test_name, True)
+        just_pass_fail(test_name, True)
+    else:
+        err = response.get("message", "Unknown error")
+        record_result(test_name, False, error=err)
+        just_pass_fail(test_name, False)
+
+def test_receive_message(client, queue_name):
+    test_name = "Receive Message"
+    response = client.receive_message(queue_name, "queue")
     if response is None:
         record_result(test_name, False, error="No response received.")
         just_pass_fail(test_name, False)
@@ -119,20 +134,6 @@ def test_send_message(client, queue_name):
         record_result(test_name, False, error=err)
         just_pass_fail(test_name, False)
 
-def test_receive_message(client, queue_name):
-    test_name = "Receive Message"
-    response = client.receive_message(queue_name, "queue")
-    if response is None:
-        record_result(test_name, False, error="No response received.")
-        just_pass_fail(test_name, False)
-    elif response.get("success") is True:
-        record_result(test_name, True)
-        just_pass_fail(test_name, True)
-    else:
-        err = response.get("message", "Unknown error")
-        record_result(test_name, False, error=err)
-        just_pass_fail(test_name, False)
-
 def test_protected(client):
     test_name = "Protected Resource"
     resp = client.get_protected_resource()
@@ -147,21 +148,24 @@ def main():
     logging.basicConfig(level=logging.INFO)
     client = MOMClient()
 
-    # Ejecutar tests:
+    # Ejecución de las pruebas en el siguiente orden:
+    # 1) Home
     test_home(client)
-    
+    # 2) Login
     if not test_login(client):
         sys.exit(1)
-    
-    # Usar la queue "queue-example" (asumida existente o configurada para tests)
-    test_queue = "queue-example"
-    test_subscribe(client, test_queue)
-    test_unsubscribe(client, test_queue)
-    test_send_message(client, test_queue)
-    test_receive_message(client, test_queue)
+    # 3) Subscribe
+    test_subscribe(client, "queue-example")
+    # 4) Receive Message
+    test_receive_message(client, "queue-example")
+    # 5) Unsubscribe
+    test_unsubscribe(client, "queue-example")
+    # 6) Send Message
+    test_send_message(client, "queue-example")
+    # 7) Protected Resource
     test_protected(client)
 
-    # Mostrar tabla centrada de resultados
+    # Mostrar tabla de resultados
     print(f"\n{BLUE}=== TEST RESULTS ==={RESET}")
     results_table = []
     for t in test_results:

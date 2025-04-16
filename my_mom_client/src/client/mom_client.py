@@ -46,7 +46,7 @@ class MOMClient:
         if response and "access_token" in response and "token_type" in response:
             self.token = response["access_token"]
             self.token_type = response["token_type"]
-            self.logger.info("Login successful.")
+            #self.logger.info("Login successful.")
             return response
         self.logger.error("Login failed: %s", response)
         return None
