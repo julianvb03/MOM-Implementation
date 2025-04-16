@@ -185,7 +185,7 @@ class MOMQueueManager:
                 if not queue_exists_somewhere:
                     return QueueOperationResult(
                         success=False,
-                        status=MOMQueueStatus.QUEUE_NOT_EXIST,
+                        status=MOMQueueStatus.METADATA_OR_QUEUE_NOT_EXIST,
                         details="La cola no existe en ningún nodo",
                         replication_result=False
                     )
@@ -301,7 +301,7 @@ class MOMQueueManager:
                 if not queue_exists_somewhere:
                     return QueueOperationResult(
                         success=False,
-                        status=MOMQueueStatus.QUEUE_NOT_EXIST,
+                        status=MOMQueueStatus.METADATA_OR_QUEUE_NOT_EXIST,
                         details="La cola no existe en ningún nodo",
                         replication_result=False
                     )

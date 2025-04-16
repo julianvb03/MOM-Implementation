@@ -101,6 +101,20 @@ service QueueReplication {
   rpc QueueReplicateForwardEnqueue(QueueForwardEnqueueRequest) returns (ReplicationResponse) {}
   // Forward queue dequeue
   rpc QueueReplicateForwardDequeue(QueueForwardDequeueRequest) returns (ReplicationResponse) {}
+  // Forward queue subscribe
+  rpc QueueReplicateForwardSubscribe(QueueForwardSubscribeRequest) returns (ReplicationResponse) {}
+  // Forward queue unsubscribe
+  rpc QueueReplicateForwardUnsubscribe(QueueForwardUnsubscribeRequest) returns (ReplicationResponse) {}
+}
+
+message QueueForwardSubscribeRequest {
+  string queue_name = 1;
+  string subscriber = 2;
+}
+
+message QueueForwardUnsubscribeRequest {
+  string queue_name = 1;
+  string subscriber = 2;
 }
 
 message QueueForwardEnqueueRequest {

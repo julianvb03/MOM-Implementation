@@ -57,6 +57,36 @@ class SubscriptionService:
         try:
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                nodes = ["A", "B", "C"]
+                queue_exists_somewhere = False
+                target_nodes = []
+
+                for node in nodes:
+                    # Verificamos si "queue:queue_name" está en el set del nodo
+                    members = self.redis_nodes.smembers(node)
+                    if f"queue:{queue_name}" in members:
+                        queue_exists_somewhere = True
+                        target_nodes.append(node)
+
+                if not queue_exists_somewhere:
+                    return QueueOperationResult(
+                        success=False,
+                        status=MOMQueueStatus.METADATA_OR_QUEUE_NOT_EXIST,
+                        details="Queue does not exist in any node",
+                        replication_result=False
+                    )
+
+                # Si la cola existe en algún nodo, intentamos el forward
+                nodes.remove(WHOAMI)
+                for node in nodes:
+                    if node in target_nodes:  # Solo intentamos forward a nodos donde sabemos que existe la cola
+                        result = self.replication_client.forward_subscribe(
+                            queue_name=queue_name,
+                            user=self.user,
+                            node=node
+                        )
+                        if result.success:
+                            return result
                 result.replication_result = False
                 return result
 
@@ -118,6 +148,39 @@ class SubscriptionService:
         try:
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                # Verificamos si la cola existe en algún nodo usando SMEMBERS
+                nodes = ["A", "B", "C"]
+                queue_exists_somewhere = False
+                target_nodes = []
+
+                for node in nodes:
+                    # Verificamos si "queue:queue_name" está en el set del nodo
+                    members = self.redis_nodes.smembers(node)
+                    if f"queue:{queue_name}" in members:
+                        queue_exists_somewhere = True
+                        target_nodes.append(node)
+
+                if not queue_exists_somewhere:
+                    return QueueOperationResult(
+                        success=False,
+                        status=MOMQueueStatus.METADATA_OR_QUEUE_NOT_EXIST,
+                        details="Queue does not exist in any node",
+                        replication_result=False
+                    )
+
+                # Si la cola existe en algún nodo, intentamos el forward
+                nodes.remove(WHOAMI)
+                for node in nodes:
+                    if node in target_nodes:  # Solo intentamos forward a nodos donde sabemos que existe la cola
+                        result = self.replication_client.forward_unsubscribe(
+                            queue_name=queue_name,
+                            user=self.user,
+                            node=node
+                        )
+                        if result.success:
+                            return result
+
+                result.success = False
                 result.replication_result = False
                 return result
 

@@ -14,6 +14,8 @@ from app.grpc.replication_service_pb2 import (
     DequeueRequest,
     QueueForwardEnqueueRequest,
     QueueForwardDequeueRequest,
+    QueueForwardSubscribeRequest,
+    QueueForwardUnsubscribeRequest,
 )
 from app.grpc.replication_service_pb2_grpc import QueueReplicationStub
 from app.domain.utils import get_node_stubs
@@ -268,6 +270,96 @@ class QueueReplicationClient:
         except Exception as e:
             logger.exception("Error en forward_dequeue")
             return QueueOperationResult(
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details=str(e)
+            )
+        
+    def forward_subscribe(self, queue_name: str, user: str, node: str) -> QueueOperationResult:
+        queue_stub, _ = get_node_stubs(node)
+
+        if not queue_stub:
+            return QueueOperationResult(
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details="Cannot forward subscribe to node"
+            )
+
+        try:
+            request = QueueForwardSubscribeRequest(
+                queue_name=queue_name,
+                subscriber=user,
+            )
+            response = queue_stub.QueueReplicateForwardSubscribe(request)
+            
+            if response.success:
+                try:
+                    message_data = json.loads(response.message)
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=message_data.get("details", "Successfully subscribed to queue")
+                    )
+                except json.JSONDecodeError:
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=response.message
+                    )
+            else:
+                return QueueOperationResult(
+                    success=False,
+                    status=MOMQueueStatus.INTERNAL_ERROR,
+                    details=response.message
+                )
+        except Exception as e:
+            logger.exception("Error en forward_subscribe")
+            return QueueOperationResult(    
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details=str(e)
+            )
+        
+    def forward_unsubscribe(self, queue_name: str, user: str, node: str) -> QueueOperationResult:
+        queue_stub, _ = get_node_stubs(node)
+
+        if not queue_stub:
+            return QueueOperationResult(
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details="No se pudo obtener el stub del nodo"
+            )
+
+        try:
+            request = QueueForwardUnsubscribeRequest(
+                queue_name=queue_name,
+                subscriber=user,
+            )
+            response = queue_stub.QueueReplicateForwardUnsubscribe(request)
+            
+            if response.success:
+                try:
+                    message_data = json.loads(response.message)
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=message_data.get("details", "Desuscripción realizada correctamente")
+                    )
+                except json.JSONDecodeError:
+                    return QueueOperationResult(
+                        success=True,
+                        status=MOMQueueStatus.SUCCES_OPERATION,
+                        details=response.message
+                    )
+            else:
+                return QueueOperationResult(
+                    success=False,
+                    status=MOMQueueStatus.INTERNAL_ERROR,
+                    details=response.message
+                )
+        except Exception as e:
+            logger.exception("Error en forward_unsubscribe")
+            return QueueOperationResult(    
                 success=False,
                 status=MOMQueueStatus.INTERNAL_ERROR,
                 details=str(e)
