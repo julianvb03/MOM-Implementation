@@ -65,6 +65,16 @@ class TopicReplicationStub(object):
                 request_serializer=replication__service__pb2.TopicUnsubscribeRequest.SerializeToString,
                 response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
                 _registered_method=True)
+        self.TopicReplicateForwardPublishMessage = channel.unary_unary(
+                '/app.grpc.TopicReplication/TopicReplicateForwardPublishMessage',
+                request_serializer=replication__service__pb2.TopicForwardPublishMessageRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.TopicReplicateForwardConsumeMessage = channel.unary_unary(
+                '/app.grpc.TopicReplication/TopicReplicateForwardConsumeMessage',
+                request_serializer=replication__service__pb2.TopicForwardConsumeMessageRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
 
 
 class TopicReplicationServicer(object):
@@ -100,14 +110,29 @@ class TopicReplicationServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def TopicReplicateSubscribe(self, request, context):
-        """Subscribe user replication
+        """Subscribe user replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def TopicReplicateUnsubscribe(self, request, context):
-        """Unsubscribe user replication
+        """Unsubscribe user replication Done
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TopicReplicateForwardPublishMessage(self, request, context):
+        """Forwar topic publis
+        This is the call when i not have the topic or queu but it exist in the other node
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TopicReplicateForwardConsumeMessage(self, request, context):
+        """Forward topic consume
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -144,6 +169,16 @@ def add_TopicReplicationServicer_to_server(servicer, server):
             'TopicReplicateUnsubscribe': grpc.unary_unary_rpc_method_handler(
                     servicer.TopicReplicateUnsubscribe,
                     request_deserializer=replication__service__pb2.TopicUnsubscribeRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'TopicReplicateForwardPublishMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.TopicReplicateForwardPublishMessage,
+                    request_deserializer=replication__service__pb2.TopicForwardPublishMessageRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'TopicReplicateForwardConsumeMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.TopicReplicateForwardConsumeMessage,
+                    request_deserializer=replication__service__pb2.TopicForwardConsumeMessageRequest.FromString,
                     response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
             ),
     }
@@ -320,6 +355,60 @@ class TopicReplication(object):
             metadata,
             _registered_method=True)
 
+    @staticmethod
+    def TopicReplicateForwardPublishMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.TopicReplication/TopicReplicateForwardPublishMessage',
+            replication__service__pb2.TopicForwardPublishMessageRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TopicReplicateForwardConsumeMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.TopicReplication/TopicReplicateForwardConsumeMessage',
+            replication__service__pb2.TopicForwardConsumeMessageRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
 
 class QueueReplicationStub(object):
     """Replication service for queues
@@ -361,6 +450,16 @@ class QueueReplicationStub(object):
                 request_serializer=replication__service__pb2.DequeueRequest.SerializeToString,
                 response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
                 _registered_method=True)
+        self.QueueReplicateForwardEnqueue = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateForwardEnqueue',
+                request_serializer=replication__service__pb2.QueueForwardEnqueueRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.QueueReplicateForwardDequeue = channel.unary_unary(
+                '/app.grpc.QueueReplication/QueueReplicateForwardDequeue',
+                request_serializer=replication__service__pb2.QueueForwardDequeueRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
 
 
 class QueueReplicationServicer(object):
@@ -368,42 +467,56 @@ class QueueReplicationServicer(object):
     """
 
     def QueueReplicateCreate(self, request, context):
-        """Create queue replication
+        """Create queue replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def QueueReplicateDelete(self, request, context):
-        """Delete queue replication
+        """Delete queue replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def QueueReplicateEnqueue(self, request, context):
-        """Publish message replication
+        """Publish message replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def QueueReplicateSubscribe(self, request, context):
-        """Subscribe user replication
+        """Subscribe user replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def QueueReplicateUnsubscribe(self, request, context):
-        """Unsubscribe user replication
+        """Unsubscribe user replication Done
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def QueueReplicateDequeue(self, request, context):
-        """Dequeue message replication
+        """Dequeue message replication Done
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueueReplicateForwardEnqueue(self, request, context):
+        """Forward queue enqueue
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueueReplicateForwardDequeue(self, request, context):
+        """Forward queue dequeue
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -440,6 +553,16 @@ def add_QueueReplicationServicer_to_server(servicer, server):
             'QueueReplicateDequeue': grpc.unary_unary_rpc_method_handler(
                     servicer.QueueReplicateDequeue,
                     request_deserializer=replication__service__pb2.DequeueRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateForwardEnqueue': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateForwardEnqueue,
+                    request_deserializer=replication__service__pb2.QueueForwardEnqueueRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'QueueReplicateForwardDequeue': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueueReplicateForwardDequeue,
+                    request_deserializer=replication__service__pb2.QueueForwardDequeueRequest.FromString,
                     response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
             ),
     }
@@ -605,6 +728,60 @@ class QueueReplication(object):
             target,
             '/app.grpc.QueueReplication/QueueReplicateDequeue',
             replication__service__pb2.DequeueRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateForwardEnqueue(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateForwardEnqueue',
+            replication__service__pb2.QueueForwardEnqueueRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueueReplicateForwardDequeue(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.QueueReplication/QueueReplicateForwardDequeue',
+            replication__service__pb2.QueueForwardDequeueRequest.SerializeToString,
             replication__service__pb2.ReplicationResponse.FromString,
             options,
             channel_credentials,

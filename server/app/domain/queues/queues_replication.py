@@ -12,9 +12,12 @@ from app.grpc.replication_service_pb2 import (
     QueueSubscribeRequest,
     QueueUnsubscribeRequest,
     DequeueRequest,
+    QueueForwardEnqueueRequest,
+    QueueForwardDequeueRequest,
 )
 from app.grpc.replication_service_pb2_grpc import QueueReplicationStub
-
+from app.domain.utils import get_node_stubs
+from app.domain.models import QueueOperationResult, MOMQueueStatus
 
 class QueueReplicationClient:
     """Client for topic replication via gRPC"""
@@ -173,3 +176,74 @@ class QueueReplicationClient:
             return False
         except Exception: # pylint: disable=W0718
             return False
+
+    def forward_enqueue(self, queue_name: str, user: str, message: str, node: str) -> QueueOperationResult:
+        queue_stub, _ = get_node_stubs(node)
+
+        if not queue_stub:
+            return QueueOperationResult(
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details="No se pudo obtener el stub del nodo"
+            )
+
+        try:
+            request = QueueForwardEnqueueRequest(
+                queue_name=queue_name,
+                publisher=user,
+                message=message,
+            )
+            response = queue_stub.QueueReplicateForwardEnqueue(request)
+            if response.success:
+                return QueueOperationResult(
+                    success=True,
+                    status=MOMQueueStatus.SUCCESS,
+                    details="Mensaje encolado correctamente"
+                )
+            else:
+                return QueueOperationResult(
+                    success=False,
+                    status=MOMQueueStatus.INTERNAL_ERROR,
+                    details="Error en la encolación del mensaje"
+                )
+        except Exception: # pylint: disable=W0718
+            return QueueOperationResult(    
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details="Error en la encolación del mensaje"
+            )
+
+    def forward_dequeue(self, queue_name: str, user: str, node: str):
+        queue_stub, _ = get_node_stubs(node)
+
+        if not queue_stub:
+            return QueueOperationResult(
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details="No se pudo obtener el stub del nodo"
+            )
+
+        try:
+            request = QueueForwardDequeueRequest(
+                queue_name=queue_name,
+                subscriber=user,
+            )
+            response = queue_stub.QueueReplicateForwardDequeue(request)
+            if response.success:
+                return QueueOperationResult(
+                    success=True,
+                    status=MOMQueueStatus.SUCCESS,
+                    details=response.message
+                )
+            else:
+                return QueueOperationResult(
+                    success=False,
+                    status=MOMQueueStatus.INTERNAL_ERROR,
+                    details="Error en la desencolación del mensaje"
+                )
+        except Exception: # pylint: disable=W0718
+            return QueueOperationResult(
+                success=False,
+                status=MOMQueueStatus.INTERNAL_ERROR,
+                details="Error en la desencolación del mensaje"
+            )

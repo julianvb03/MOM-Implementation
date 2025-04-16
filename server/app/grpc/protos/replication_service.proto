@@ -27,10 +27,26 @@ service TopicReplication {
   rpc TopicReplicatePublishMessage(TopicPublishMessageRequest) returns (ReplicationResponse) {}
   // Consume message replication Done
   rpc TopicReplicateConsumeMessage(TopicConsumeMessageRequest) returns (ReplicationResponse) {}
-  // Subscribe user replication
+  // Subscribe user replication Done
   rpc TopicReplicateSubscribe(TopicSubscribeRequest) returns (ReplicationResponse) {}
-  // Unsubscribe user replication
+  // Unsubscribe user replication Done
   rpc TopicReplicateUnsubscribe(TopicUnsubscribeRequest) returns (ReplicationResponse) {}
+  // Forwar topic publis
+  // This is the call when i not have the topic or queu but it exist in the other node
+  rpc TopicReplicateForwardPublishMessage(TopicForwardPublishMessageRequest) returns (ReplicationResponse) {}
+  // Forward topic consume
+  rpc TopicReplicateForwardConsumeMessage(TopicForwardConsumeMessageRequest) returns (ReplicationResponse) {}
+}
+
+message TopicForwardPublishMessageRequest {
+  string topic_name = 1;
+  string publisher = 2;
+  string message = 3;
+}
+
+message TopicForwardConsumeMessageRequest {
+  string topic_name = 1;
+  string subscriber = 2;
 }
 
 message CreateTopicRequest {
@@ -69,18 +85,33 @@ message TopicUnsubscribeRequest {
 
 // Replication service for queues
 service QueueReplication {
-  // Create queue replication
+  // Create queue replication Done
   rpc QueueReplicateCreate(CreateQueueRequest) returns (ReplicationResponse) {}
-  // Delete queue replication
+  // Delete queue replication Done
   rpc QueueReplicateDelete(DeleteQueueRequest) returns (ReplicationResponse) {}
-  // Publish message replication
+  // Publish message replication Done
   rpc QueueReplicateEnqueue(EnqueueRequest) returns (ReplicationResponse) {}
-  // Subscribe user replication
+  // Subscribe user replication Done
   rpc QueueReplicateSubscribe(QueueSubscribeRequest) returns (ReplicationResponse) {}
-  // Unsubscribe user replication
+  // Unsubscribe user replication Done
   rpc QueueReplicateUnsubscribe(QueueUnsubscribeRequest) returns (ReplicationResponse) {}
-  // Dequeue message replication
+  // Dequeue message replication Done
   rpc QueueReplicateDequeue(DequeueRequest) returns (ReplicationResponse) {}
+  // Forward queue enqueue
+  rpc QueueReplicateForwardEnqueue(QueueForwardEnqueueRequest) returns (ReplicationResponse) {}
+  // Forward queue dequeue
+  rpc QueueReplicateForwardDequeue(QueueForwardDequeueRequest) returns (ReplicationResponse) {}
+}
+
+message QueueForwardEnqueueRequest {
+  string queue_name = 1;
+  string publisher = 2;
+  string message = 3;
+}
+
+message QueueForwardDequeueRequest {
+  string queue_name = 1;
+  string subscriber = 2;
 }
 
 message CreateQueueRequest {

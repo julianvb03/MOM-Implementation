@@ -325,6 +325,11 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
+    def TopicReplicateForwardPublishMessage(self, request, context):
+        pass
+
+    def TopicReplicateForwardConsumeMessage(self, request, context):
+        pass
 
 class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServicer): # pylint: disable=C0301
     """
@@ -618,6 +623,92 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
+    def QueueReplicateForwardEnqueue(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            queue_manager = MOMQueueManager(db, request.publisher)
+            result = queue_manager.enqueue(
+                message=request.message,
+                queue_name=request.queue_name,
+                im_replicating=False,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Message enqueued successfully",
+            )
+        except Exception as e: # pylint: disable=W0703
+            logger.exception("Error inesperado en QueueReplicateForwardEnqueue")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e) # pylint: disable=C0301
+            )
+            
+    def QueueReplicateForwardDequeue(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            queue_manager = MOMQueueManager(db, request.subscriber)
+            result = queue_manager.dequeue(
+                queue_name=request.queue_name,
+                im_replicating=False,
+                endpoint=True
+            )
+            
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=result.details,
+            )
+        except Exception as e: # pylint: disable=W0703
+            logger.exception("Error inesperado en QueueReplicateForwardDequeue")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e) # pylint: disable=C0301
+            )
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

@@ -170,6 +170,19 @@ class MOMQueueManager:
 
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                nodes = ["A", "B", "C"]
+                nodes.remove(WHOAMI)
+
+                for node in nodes:
+                    result = self.replication_client.forward_enqueue(
+                        queue_name=queue_name,
+                        user=self.user,
+                        message=message,
+                        node=node
+                    )
+                    if result.success:
+                        return result
+                    
                 result.success = False
                 result.replication_result = False
                 return result
@@ -253,9 +266,23 @@ class MOMQueueManager:
         try:
             result = self.validator.validate_queue_exists(queue_name)
             if result.success is False:
+                nodes = ["A", "B", "C"]
+                nodes.remove(WHOAMI)
+
+                for node in nodes:
+                    result = self.replication_client.forward_dequeue(
+                        queue_name=queue_name,
+                        user=self.user,
+                        node=node
+                    )
+                    if result.success:
+                        return result
+                
+                result.success = False
                 result.replication_result = False
                 return result
-
+            
+            
             result = self.validator.validate_user_subscribed(queue_name)
             if result.success is False:
                 result.replication_result = False

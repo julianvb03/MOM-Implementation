@@ -2,8 +2,15 @@
 Utils for MOM
 """
 
+import grpc
+import os
 from app.domain.models import QueueOperationResult, MOMQueueStatus
 from app.domain.logger_config import logger
+from typing import Dict, Tuple
+from app.grpc.replication_service_pb2_grpc import (
+    QueueReplicationStub,
+    TopicReplicationStub
+)
 
 class KeyBuilder:
     """
@@ -86,3 +93,78 @@ def limpiar_user(texto):
     texto = texto.replace("'", "")
     texto = texto.replace("[", "").replace("]", "")
     return texto
+
+NODES = {
+    "A": {
+        "ip": os.getenv("NODE_A_IP", "localhost"),
+        "grpc_port": os.getenv("GRPC_PORT", "50051")
+    },
+    "B": {
+        "ip": os.getenv("NODE_B_IP", "localhost"),
+        "grpc_port": os.getenv("GRPC_PORT", "50051")
+    },
+    "C": {
+        "ip": os.getenv("NODE_C_IP", "localhost"),
+        "grpc_port": os.getenv("GRPC_PORT", "50051")
+    }
+}
+
+class NodeClients:
+    """Class to handle the stubs of the connections to all nodes"""
+    
+    def __init__(self):
+        self.queue_stubs: Dict[str, QueueReplicationStub] = {}
+        self.topic_stubs: Dict[str, TopicReplicationStub] = {}
+        self.channels: Dict[str, grpc.Channel] = {}
+        self._initialize_stubs()
+
+    def _initialize_stubs(self):
+        """Initialize the connections with all nodes"""
+        for node_id, config in NODES.items():
+            try:
+                address = f"{config['ip']}:{config['grpc_port']}"
+                channel = grpc.insecure_channel(address)
+                self.channels[node_id] = channel
+                
+                # Crear stubs para Queue y Topic
+                self.queue_stubs[node_id] = QueueReplicationStub(channel)
+                self.topic_stubs[node_id] = TopicReplicationStub(channel)
+                
+                logger.info(f"Conexión establecida con nodo {node_id} en {address}")
+            except Exception as e:
+                logger.error(f"Error conectando con nodo {node_id}: {str(e)}")
+                self.channels[node_id] = None
+                self.queue_stubs[node_id] = None
+                self.topic_stubs[node_id] = None
+
+    def get_stubs(self, node_id: str) -> Tuple[QueueReplicationStub, TopicReplicationStub]:
+        """
+        Get the stubs for a specific node
+        Args:
+            node_id (str): ID of the node (A, B, or C)
+        Returns:
+            Tuple[QueueReplicationStub, TopicReplicationStub]: Tuple with the stubs
+        """
+        return self.queue_stubs.get(node_id), self.topic_stubs.get(node_id)
+
+    def close_all(self):
+        """Close all connections"""
+        for node_id, channel in self.channels.items():
+            if channel:
+                try:
+                    channel.close()
+                    logger.info(f"Conexión cerrada con nodo {node_id}")
+                except Exception as e:
+                    logger.error(f"Error cerrando conexión con nodo {node_id}: {str(e)}")
+
+node_clients = NodeClients()
+
+def get_node_stubs(node_id: str) -> Tuple[QueueReplicationStub, TopicReplicationStub]:
+    """
+    Helper function to get the stubs of a node
+    Args:
+        node_id (str): ID of the node (A, B, or C)
+    Returns:
+        Tuple[QueueReplicationStub, TopicReplicationStub]: Tuple with the stubs
+    """
+    return node_clients.get_stubs(node_id)
