@@ -75,6 +75,16 @@ class TopicReplicationStub(object):
                 request_serializer=replication__service__pb2.TopicForwardConsumeMessageRequest.SerializeToString,
                 response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
                 _registered_method=True)
+        self.TopicReplicateForwardSubscribe = channel.unary_unary(
+                '/app.grpc.TopicReplication/TopicReplicateForwardSubscribe',
+                request_serializer=replication__service__pb2.TopicForwardSubscribeRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
+        self.TopicReplicateForwardUnsubscribe = channel.unary_unary(
+                '/app.grpc.TopicReplication/TopicReplicateForwardUnsubscribe',
+                request_serializer=replication__service__pb2.TopicForwardUnsubscribeRequest.SerializeToString,
+                response_deserializer=replication__service__pb2.ReplicationResponse.FromString,
+                _registered_method=True)
 
 
 class TopicReplicationServicer(object):
@@ -138,6 +148,20 @@ class TopicReplicationServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def TopicReplicateForwardSubscribe(self, request, context):
+        """Forward topic subscribe
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TopicReplicateForwardUnsubscribe(self, request, context):
+        """Forward topic unsubscribe
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_TopicReplicationServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -179,6 +203,16 @@ def add_TopicReplicationServicer_to_server(servicer, server):
             'TopicReplicateForwardConsumeMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.TopicReplicateForwardConsumeMessage,
                     request_deserializer=replication__service__pb2.TopicForwardConsumeMessageRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'TopicReplicateForwardSubscribe': grpc.unary_unary_rpc_method_handler(
+                    servicer.TopicReplicateForwardSubscribe,
+                    request_deserializer=replication__service__pb2.TopicForwardSubscribeRequest.FromString,
+                    response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
+            ),
+            'TopicReplicateForwardUnsubscribe': grpc.unary_unary_rpc_method_handler(
+                    servicer.TopicReplicateForwardUnsubscribe,
+                    request_deserializer=replication__service__pb2.TopicForwardUnsubscribeRequest.FromString,
                     response_serializer=replication__service__pb2.ReplicationResponse.SerializeToString,
             ),
     }
@@ -398,6 +432,60 @@ class TopicReplication(object):
             target,
             '/app.grpc.TopicReplication/TopicReplicateForwardConsumeMessage',
             replication__service__pb2.TopicForwardConsumeMessageRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TopicReplicateForwardSubscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.TopicReplication/TopicReplicateForwardSubscribe',
+            replication__service__pb2.TopicForwardSubscribeRequest.SerializeToString,
+            replication__service__pb2.ReplicationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TopicReplicateForwardUnsubscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/app.grpc.TopicReplication/TopicReplicateForwardUnsubscribe',
+            replication__service__pb2.TopicForwardUnsubscribeRequest.SerializeToString,
             replication__service__pb2.ReplicationResponse.FromString,
             options,
             channel_credentials,

@@ -36,6 +36,20 @@ service TopicReplication {
   rpc TopicReplicateForwardPublishMessage(TopicForwardPublishMessageRequest) returns (ReplicationResponse) {}
   // Forward topic consume
   rpc TopicReplicateForwardConsumeMessage(TopicForwardConsumeMessageRequest) returns (ReplicationResponse) {}
+  // Forward topic subscribe
+  rpc TopicReplicateForwardSubscribe(TopicForwardSubscribeRequest) returns (ReplicationResponse) {}
+  // Forward topic unsubscribe
+  rpc TopicReplicateForwardUnsubscribe(TopicForwardUnsubscribeRequest) returns (ReplicationResponse) {}
+}
+
+message TopicForwardSubscribeRequest {
+  string topic_name = 1;
+  string subscriber = 2;
+}
+
+message TopicForwardUnsubscribeRequest {
+  string topic_name = 1;
+  string subscriber = 2;
 }
 
 message TopicForwardPublishMessageRequest {

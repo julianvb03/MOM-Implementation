@@ -331,6 +331,98 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
     def TopicReplicateForwardConsumeMessage(self, request, context):
         pass
 
+    def TopicReplicateForwardSubscribe(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.subscriber)
+            result = topic_manager.subscriptions.subscribe(
+                topic_name=request.topic_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully subscribed to topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardSubscribe")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def TopicReplicateForwardUnsubscribe(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.subscriber)
+            result = topic_manager.subscriptions.unsubscribe(
+                topic_name=request.topic_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully unsubscribed from topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardUnsubscribe")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
 class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServicer): # pylint: disable=C0301
     """
     Service for managing queue replication.
