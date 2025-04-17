@@ -1,171 +1,136 @@
+```markdown
 # MOM Client
 
 MOM Client is a Python application that communicates with a Message Oriented Middleware (MOM) API. The client supports various operations for both topics and queues, including:
 
-- **Home:** Check API connectivity.
-- **Login:** Authenticate the user.
-- **Subscribe:** Subscribe to a channel (queue or topic).
-- **Unsubscribe:** Unsubscribe from a channel.
-- **Send Message:** Send a message to a channel.
-- **Close:** Stop the client.
-- **Action Processing:** The client reads commands continuously from a user-specific actions file.
+- **Home:** Check API connectivity.  
+- **Login:** Authenticate the user.  
+- **Subscribe:** Subscribe to a channel (queue or topic).  
+- **Unsubscribe:** Unsubscribe from a channel.  
+- **Send Message:** Send a message to a channel.  
+- **Close:** Stop the client.  
+- **Action Processing:** Read commands from a per‑user file in `actions/<username>.txt`.  
+- **Background Listener:** Continuously listen (every second) for messages on all subscribed channels.  
+- **Automatic Re‑login:** On any 401 Unauthorized, the client will auto re‑authenticate and retry the failed request.  
 
-All detailed log messages are saved to files in the `logs/` folder. A global log is saved in `logs/app.log`, and each user has a dedicated log file named `<username>.log`.
+All detailed log messages are saved to `logs/app.log` (global) and `logs/<username>.log` (per user). The terminal shows only the response messages in color.
 
 > **Note:**  
-> The "receive" command is not used as an action in the file because the client listens continuously on subscribed channels in the background.
+> The listener prints only non‑empty messages. If a queue/topic is empty, no output appears.
+
+---
 
 ## Project Structure
 
-```plaintext
-my_mom_client/
-├── actions/                  # Folder for per-user actions files (e.g., julian.txt)
-├── env/                      # Virtual environment folder (do not version control)
-├── logs/                     # Folder for log files (e.g., app.log, <username>.log)
-├── src/
-│   ├── client/
-│   │   ├── __init__.py       # (Empty)
-│   │   ├── mom_client.py     # Contains the MOMClient class with API methods (login, subscribe, etc.)
-│   │   └── utils.py          # Utility functions (read_config, do_request, etc.)
-│   ├── __init__.py           # (Empty)
-│   ├── config.yaml           # Configuration file (API URL, credentials, timeout, etc.)
-│   └── main.py               # Main entry point for the client application
-├── tests/                    # (Optional) Folder for tests
-│   ├── __init__.py           # (Empty)
-│   └── test_mom_client.py    # Test suite for the client (excluding action file processing)
-├── README.md                 # This file
-└── requirements.txt          # Python dependencies
 ```
+my_mom_client/
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── actions/                  # Per-user action files
+│   ├── admin.txt
+│   └── julian.txt
+├── env/                      # Virtual environment (ignored)
+├── logs/                     # Log files (ignored)
+├── src/
+│   ├── __init__.py
+│   ├── config.yaml           # API URL, credential list, timeout
+│   ├── main.py               # Entry point with error handling & listener
+│   └── client/
+│       ├── __init__.py
+│       ├── mom_client.py     # MOMClient class (login, subscribe, etc.)
+│       └── utils.py          # Helpers (read_config, do_request, etc.)
+└── tests/                    # Optional tests
+    ├── __init__.py
+    ├── queue_utils.py
+    └── test_mom_client.py
+```
+
+---
 
 ## Prerequisites
 
-- **Python 3.8+** – [Download Python](https://www.python.org/downloads/)
-- **pip** – Python package installer  
-- Recommended: use a virtual environment (e.g., `venv`)
+- **Python 3.8+**  
+- **pip** (or `python -m pip`)  
+- Recommended: use a virtual environment (e.g. `venv`)
+
+---
 
 ## Installation
 
-1. **Clone the repository:**
+1. **Clone & enter project:**
+   ```bash
+   git clone <repository_url>
+   cd my_mom_client
+   ```
 
-```bash
-git clone <repository_url>
-cd my_mom_client
-```
+2. **Create & activate a virtual environment:**
+   ```bash
+   python -m venv env
+   source env/bin/activate      # Linux/macOS
+   .\env\Scripts\Activate.ps1   # Windows PowerShell
+   ```
 
-2. **Create and activate a virtual environment:**
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- **Linux/macOS:**
-  ```bash
-  python -m venv env
-  source env/bin/activate
-  ```
-- **Windows (CMD):**
-  ```cmd
-  python -m venv env
-  env\Scripts\activate
-  ```
-- **Windows (PowerShell):**
-  ```powershell
-  python -m venv env
-  .\env\Scripts\Activate.ps1
-  ```
-
-3. **Install required packages:**
-
-```bash
-pip install -r requirements.txt
-```
+---
 
 ## Configuration
 
-Edit the `src/config.yaml`:
+Edit `src/config.yaml`:
 
 ```yaml
 api_base_url: "http://localhost:8080/api/v1.0.0/MomServer"
 credentials:
-  username: "admin"
-  password: "123"
+  - username: "admin"
+    password: "123"
+  - username: "julian"
+    password: "abc"
 timeout: 10  # seconds
 ```
 
-## Actions File Format
+---
 
-Each user has their own actions file in `actions/<username>.txt`. Commands:
+## Per‑User Actions
 
-- **Subscribe:**
-  ```
-  subscribe;channel;type
-  ```
+Each user has a file `actions/<username>.txt`. One command per line:
 
-- **Unsubscribe:**
-  ```
-  unsubscribe;channel;type
-  ```
+```
+subscribe;my_queue;queue
+send;my_queue;Hello from <user>;queue
+unsubscribe;my_queue;queue
 
-- **Send Message:**
-  ```
-  send;channel;message;type
-  ```
+subscribe;my_topic;topic
+send;my_topic;Message for <user>;topic
+unsubscribe;my_topic;topic
 
-- **Close:**
-  ```
-  close
-  ```
-
-## Running the Client
-
-1. **Prepare Actions File:**
-
-```plaintext
-subscribe;queue-example;queue
-send;queue-example;Hello, world!;queue
-unsubscribe;queue-example;queue
 close
 ```
 
-2. **Run Client:**
+---
+
+## Running the Client
 
 ```bash
 python src/main.py
 ```
 
-- Client verifies API connectivity.
-- Prompts user credentials.
-- Logs are in `logs/app.log` and `logs/<username>.log`.
-- Actions from `actions/<username>.txt` processed sequentially.
+1. Checks API home endpoint.  
+2. Auto‑loads next credential and logs in.  
+3. Starts background listener thread.  
+4. Processes `actions/<username>.txt` until `close`.  
+5. Handles 401 by auto re‑login & retry.  
 
-## Example Client Session
-
-```plaintext
-Verifying connection with the API...
-Conexión exitosa con la API. Mensaje de bienvenida:
-Welcome to MOM API!
-
-Ingrese su usuario: julian
-Ingrese su contraseña: ********
-
-Intentando autenticar, por favor espere...
-Login exitoso!
-
-Archivo de acciones creado: actions/julian.txt
-
-Starting processing of actions from 'actions/julian.txt'...
-Hello, world!           ← (Printed in blue from the "send" action)
-close                   ← (Printed in yellow indicating closure)
-Cliente finalizado.
-```
-
-Detailed logs are in `logs/app.log` and `logs/julian.log`.
+---
 
 ## Troubleshooting
 
-- Check API server URL in `src/config.yaml`.
-- Actions file auto-created if missing; populate commands.
-- Logs in `logs/` contain detailed error messages.
+- Verify the `api_base_url` in `src/config.yaml`.  
+- Populate `actions/<username>.txt` with valid commands.  
+- Inspect detailed logs in `logs/` for errors.  
 
-## Additional Information
-
-- Continuous action file monitoring and command execution.
-- Minimal terminal output; detailed logging in files.
-
-Enjoy using the MOM Client!
+Enjoy using MOM Client!  
+```
