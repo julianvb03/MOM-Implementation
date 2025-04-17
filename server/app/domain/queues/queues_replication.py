@@ -253,14 +253,14 @@ class QueueReplicationClient:
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details=message_data.get("details", "Message dequeued successfully")
+                        details=message_data.get("details", "")
                     )
                 except json.JSONDecodeError:
                     # Si no es JSON, usamos el mensaje directamente
                     return QueueOperationResult(
                         success=True,
                         status=MOMQueueStatus.SUCCES_OPERATION,
-                        details="Error dequeueing message"
+                        details=""
                     )
             else:
                 return QueueOperationResult(
