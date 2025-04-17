@@ -9,11 +9,49 @@ services:
     restart: always
     networks:
       - client-network
-    # volumes:
-    #   - ./client1/app:/app
-    #   - ./client1/config.yaml:/app/config.yaml
-    # command: >
-    #   sh -c "cp /app/config.yaml /app/src/config.yaml && python -m src.main"
+    volumes:
+      - ./client1/actions:/app/actions
+      - ./client1/logs:/app/logs
+      - ./client1/config.yaml:/app/src/config.yaml
+
+  client2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: client2
+    restart: always
+    networks:
+      - client-network
+    volumes:
+      - ./client2/actions:/app/actions
+      - ./client2/logs:/app/logs
+      - ./client2/config.yaml:/app/src/config.yaml
+
+  client3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: client3
+    restart: always
+    networks:
+      - client-network
+    volumes:
+      - ./client3/actions:/app/actions
+      - ./client3/logs:/app/logs
+      - ./client3/config.yaml:/app/src/config.yaml
+
+  client4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: client4
+    restart: always
+    networks:
+      - client-network
+    volumes:
+      - ./client4/actions:/app/actions
+      - ./client4/logs:/app/logs
+      - ./client4/config.yaml:/app/src/config.yaml
 
 networks:
   client-network:

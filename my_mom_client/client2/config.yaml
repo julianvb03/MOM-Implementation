@@ -1,5 +1,5 @@
 api_base_url: http://54.90.93.99/api/v1.0.0/MomServer
 credentials: 
-  - username: "usuario"
+  - username: "client2"
     password: "123"
 timeout: 10

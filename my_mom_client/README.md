@@ -1,4 +1,3 @@
-```markdown
 # MOM Client
 
 MOM Client is a Python application that communicates with a Message Oriented Middleware (MOM) API. The client supports various operations for both topics and queues, including:
@@ -133,4 +132,3 @@ python src/main.py
 - Inspect detailed logs in `logs/` for errors.  
 
 Enjoy using MOM Client!  
-```

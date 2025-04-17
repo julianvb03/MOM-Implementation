@@ -45,13 +45,6 @@ def load_config():
         print(f"{RED}Failed to load config: {e}{RESET}")
         sys.exit(1)
 
-def update_config(cfg):
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            yaml.dump(cfg, f, default_flow_style=False)
-    except Exception as e:
-        print(f"{RED}Failed to update config: {e}{RESET}")
-
 def get_next_credential():
     cfg = load_config()
     creds = cfg.get("credentials", [])
@@ -60,7 +53,6 @@ def get_next_credential():
         sys.exit(1)
     cred = creds.pop(0)
     cfg["credentials"] = creds
-    update_config(cfg)
     return cred["username"], cred["password"]
 
 def listen_subscriptions(client):
@@ -70,7 +62,9 @@ def listen_subscriptions(client):
     Print only non-empty messages.
     """
     while True:
-        for channel, qtype in client.subscribed_channels.items():
+        with client.subscribed_channels_lock:
+            items = list(client.subscribed_channels.items())
+        for channel, qtype in items:
             resp = client.receive_message(channel, qtype)
             if resp is None:
                 # Assume Unauthorized: retry login
@@ -86,7 +80,8 @@ def listen_subscriptions(client):
             if isinstance(resp, dict) and resp.get("success") and resp.get("message"):
                 msg = resp["message"].strip()
                 if msg:
-                    print(f"{BLUE}[{channel}] {msg}{RESET}")
+                    print(f"{BLUE}(Type|Channel)[{qtype}|{channel}] {msg}{RESET}")
+                    logging.info("(Type|Channel)[%s|%s] %s", qtype, channel, msg)
         time.sleep(1)
 
 def process_action(line, client):
@@ -116,7 +111,8 @@ def process_action(line, client):
             print(f"{BLUE}{resp['message']}{RESET}")
         text = (resp.get("message") or "").lower() if isinstance(resp, dict) else ""
         if (isinstance(resp, dict) and resp.get("success")) or "subscribed" in text:
-            client.subscribed_channels[name] = qtype
+            with client.subscribed_channels_lock:
+                client.subscribed_channels[name] = qtype
             logging.info("Listening on %s '%s'", qtype, name)
 
     elif cmd == "unsubscribe" and len(parts) == 3:
@@ -127,7 +123,8 @@ def process_action(line, client):
         if isinstance(resp, dict) and "message" in resp:
             print(f"{BLUE}{resp['message']}{RESET}")
         if isinstance(resp, dict) and resp.get("success"):
-            client.subscribed_channels.pop(name, None)
+            with client.subscribed_channels_lock:
+                client.subscribed_channels.pop(name, None)
 
     elif cmd == "send" and len(parts) == 4:
         resp = client.send_message(parts[1], parts[2], parts[3])
@@ -174,6 +171,7 @@ def main():
     setup_logging_to_file()
     client = MOMClient()
     client.subscribed_channels = {}
+    client.subscribed_channels_lock = threading.Lock()
 
     # 1) Home check
     print("Verifying connection with the API...")
