@@ -1,4 +1,4 @@
-api_base_url: http://54.90.93.99/api/v1.0.0/MomServer
+api_base_url: http://172.31.26.209/api/v1.0.0/MomServer
 credentials: 
   - username: "client2"
     password: "123"
