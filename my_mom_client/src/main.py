@@ -13,236 +13,207 @@ YELLOW = "\033[93m"
 BLUE   = "\033[94m"
 RESET  = "\033[0m"
 
-CONFIG_FILE = "src/config.yaml"
-ACTIONS_FILE = "actions.txt"
-DEFAULT_DELAY = 1  # 1 second delay between actions
+CONFIG_FILE   = "src/config.yaml"
+ACTIONS_DIR   = "actions"
+DEFAULT_DELAY = 1  # seconds between processing actions
 
 def setup_logging_to_file():
-    """
-    Configures logging to record all messages only in the global file 'logs/app.log'.
-    """
-    logs_dir = "logs"
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
-    log_file = os.path.join(logs_dir, "app.log")
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    file_handler = logging.FileHandler(log_file, mode="a")
-    file_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    """Log all INFO+ messages into logs/app.log only."""
+    os.makedirs("logs", exist_ok=True)
+    handler = logging.FileHandler("logs/app.log", mode="a")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+    root.addHandler(handler)
 
 def setup_user_file_logger(username):
-    """
-    Adds a FileHandler so that logs are also saved in 'logs/<username>.log' in append mode.
-    """
-    logs_dir = "logs"
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
-    log_file = os.path.join(logs_dir, f"{username}.log")
-    file_handler = logging.FileHandler(log_file, mode="a")
-    file_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-    logging.getLogger().addHandler(file_handler)
+    """Also log INFO+ messages to logs/<username>.log."""
+    os.makedirs("logs", exist_ok=True)
+    handler = logging.FileHandler(f"logs/{username}.log", mode="a")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logging.getLogger().addHandler(handler)
 
 def load_config():
-    """
-    Loads the YAML configuration from CONFIG_FILE.
-    """
     try:
         with open(CONFIG_FILE, "r") as f:
             return yaml.safe_load(f)
     except Exception as e:
-        print(f"{RED}Failed to load configuration file: {e}{RESET}")
+        print(f"{RED}Failed to load config: {e}{RESET}")
         sys.exit(1)
 
-def update_config(config):
-    """
-    Writes the updated configuration back to CONFIG_FILE.
-    """
+def update_config(cfg):
     try:
         with open(CONFIG_FILE, "w") as f:
-            yaml.dump(config, f, default_flow_style=False)
+            yaml.dump(cfg, f, default_flow_style=False)
     except Exception as e:
-        print(f"{RED}Failed to update configuration file: {e}{RESET}")
+        print(f"{RED}Failed to update config: {e}{RESET}")
 
 def get_next_credential():
-    """
-    Retrieves the next available credential from the configuration file.
-    Once a credential is used, it is removed from the list and the configuration is updated.
-    Exits if no credentials remain.
-    Returns a tuple (username, password).
-    """
-    config = load_config()
-    creds = config.get("credentials", [])
+    cfg = load_config()
+    creds = cfg.get("credentials", [])
     if not creds:
-        print(f"{RED}No more credentials available in {CONFIG_FILE}.{RESET}")
+        print(f"{RED}No more credentials available.{RESET}")
         sys.exit(1)
     cred = creds.pop(0)
-    config["credentials"] = creds
-    update_config(config)
+    cfg["credentials"] = creds
+    update_config(cfg)
     return cred["username"], cred["password"]
 
 def listen_subscriptions(client):
     """
-    Continuously listens for messages on all channels the client is subscribed to.
-    Every second, for each channel in client.subscribed_channels, it calls client.receive_message(channel, type)
-    and prints the message (in blue) if one is received and non-empty.
+    Background thread: every second, poll each subscribed channel.
+    On Unauthorized (resp None), auto re-login and retry once.
+    Print only non-empty messages.
     """
     while True:
-        for channel, ch_type in client.subscribed_channels.items():
-            resp = client.receive_message(channel, ch_type)
-            if isinstance(resp, dict) and resp.get("success") is True and "message" in resp:
-                message = resp["message"]
-                if message != None:
-                    print(f"{BLUE}[{channel}] {message.strip()}{RESET}")
+        for channel, qtype in client.subscribed_channels.items():
+            resp = client.receive_message(channel, qtype)
+            if resp is None:
+                # Assume Unauthorized: retry login
+                logging.error("Unauthorized on receive for %s; auto re-login.", client.username)
+                if client.login(client.username, client.password):
+                    logging.info("Re-login successful in listener for %s", client.username)
+                    # retry once
+                    resp = client.receive_message(channel, qtype)
+                else:
+                    logging.error("Re-login failed in listener for %s", client.username)
+                    continue
+            # if we have a dict with success/message, print non-empty
+            if isinstance(resp, dict) and resp.get("success") and resp.get("message"):
+                msg = resp["message"].strip()
+                if msg:
+                    print(f"{BLUE}[{channel}] {msg}{RESET}")
         time.sleep(1)
 
-def process_action(action_line, client):
-    """
-    Processes a single action line from the user's actions file.
-    Expected formats (without a username prefix, for per-user files):
-      - subscribe;channel;type
-      - unsubscribe;channel;type
-      - send;channel;message;type
-      - close
-    Logs the full response and prints only the 'message' field in blue.
-    Automatically re-logins if the token has expired.
-    """
-    parts = action_line.strip().split(";")
+def process_action(line, client):
+    parts = line.strip().split(";")
     if not parts:
         return None
 
-    command = parts[0].lower()
+    cmd = parts[0].lower()
     resp = None
 
-    if command == "subscribe" and len(parts) == 3:
-        resp = client.subscribe(parts[1], parts[2])
-        if isinstance(resp, dict) and resp.get("success") or isinstance(resp, dict) is True:
-            client.subscribed_channels[parts[1]] = parts[2]
-    elif command == "unsubscribe" and len(parts) == 3:
-        resp = client.unsubscribe(parts[1], parts[2])
-        if isinstance(resp, dict) and resp.get("success") is True:
-            client.subscribed_channels.pop(parts[1], None)
-    elif command == "send" and len(parts) == 4:
+    def retry_login_and_retry():
+        logging.info("Attempting auto re-login for %s", client.username)
+        if client.login(client.username, client.password):
+            logging.info("Re-login successful for %s; retrying '%s'", client.username, cmd)
+            return process_action(line, client)
+        else:
+            print(f"{RED}Re-login failed for {client.username}.{RESET}")
+            logging.error("Re-login failed for %s", client.username)
+            return None
+
+    if cmd == "subscribe" and len(parts) == 3:
+        name, qtype = parts[1], parts[2]
+        resp = client.subscribe(name, qtype)
+        if resp is None:
+            return retry_login_and_retry()
+        if isinstance(resp, dict) and "message" in resp:
+            print(f"{BLUE}{resp['message']}{RESET}")
+        text = (resp.get("message") or "").lower() if isinstance(resp, dict) else ""
+        if (isinstance(resp, dict) and resp.get("success")) or "subscribed" in text:
+            client.subscribed_channels[name] = qtype
+            logging.info("Listening on %s '%s'", qtype, name)
+
+    elif cmd == "unsubscribe" and len(parts) == 3:
+        name, qtype = parts[1], parts[2]
+        resp = client.unsubscribe(name, qtype)
+        if resp is None:
+            return retry_login_and_retry()
+        if isinstance(resp, dict) and "message" in resp:
+            print(f"{BLUE}{resp['message']}{RESET}")
+        if isinstance(resp, dict) and resp.get("success"):
+            client.subscribed_channels.pop(name, None)
+
+    elif cmd == "send" and len(parts) == 4:
         resp = client.send_message(parts[1], parts[2], parts[3])
-    elif command == "close":
+        if resp is None:
+            return retry_login_and_retry()
+        if isinstance(resp, dict) and "message" in resp:
+            print(f"{BLUE}{resp['message']}{RESET}")
+
+    elif cmd == "close":
         print(f"{YELLOW}close{RESET}")
-        logging.info("Action 'close' received. Shutting down client.")
+        logging.info("Received 'close'; shutting down.")
         return "close"
+
     else:
-        msg = f"Unknown or malformed command: {action_line.strip()}"
+        msg = f"Malformed command: {line.strip()}"
         print(f"{RED}{msg}{RESET}")
         logging.warning(msg)
         return None
 
-    logging.info("Action '%s' executed. Full response: %s", command, resp)
-
-    # Auto re-login if token expired
-    if isinstance(resp, dict) and "message" in resp and "token expired" in resp["message"].lower():
-        logging.info("Token expired detected for user %s. Attempting auto re-login.", client.username)
-        new_login = client.login(client.username, client.password)
-        if new_login:
-            logging.info("Auto re-login successful for user %s.", client.username)
-            resp = process_action(action_line, client)
-        else:
-            logging.error("Auto re-login failed for user %s.", client.username)
-
-    if isinstance(resp, dict) and "message" in resp:
-        print(f"{BLUE}{resp['message']}{RESET}")
-    elif resp is not None:
-        print(f"{BLUE}{resp}{RESET}")
-    else:
-        print(f"{RED}No response received.{RESET}")
-
+    logging.info("Action '%s' executed. Full response: %s", cmd, resp)
     return None
 
-def process_actions_file(file_path, client):
-    """
-    Continuously reads the user's actions file (actions/<username>.txt), processes the first action,
-    deletes it from the file, and repeats the process until a 'close' command is encountered.
-    """
+def process_actions_file(path, client):
+    """Continuously read/execute first line from path, remove it, until 'close'."""
     while True:
-        if not os.path.exists(file_path):
+        if not os.path.exists(path):
             time.sleep(1)
             continue
-
-        with open(file_path, "r") as f:
+        with open(path, "r") as f:
             lines = f.readlines()
         if not lines:
             time.sleep(1)
             continue
 
-        action_line = lines[0]
-        result = process_action(action_line, client)
-
-        # Rewrite the file with the remaining lines
-        with open(file_path, "w") as f:
+        first = lines[0]
+        result = process_action(first, client)
+        with open(path, "w") as f:
             f.writelines(lines[1:])
-
         if result == "close":
             break
-
         time.sleep(DEFAULT_DELAY)
 
 def main():
     setup_logging_to_file()
-
     client = MOMClient()
     client.subscribed_channels = {}
 
+    # 1) Home check
     print("Verifying connection with the API...")
-    home_msg = client.get_home_message()
-    if not home_msg:
-        print(f"{RED}Connection error: Cannot access the API.{RESET}")
-        logging.error("Connection failed: Home endpoint not accessible.")
+    home = client.get_home_message()
+    if not home:
+        print(f"{RED}Cannot reach API.{RESET}")
+        logging.error("Home endpoint unreachable.")
         sys.exit(1)
-    print(f"{GREEN}Successfully connected to the API. Welcome message:{RESET}")
-    print(f"{GREEN}{home_msg}{RESET}")
+    print(f"{GREEN}Connected. Welcome:{RESET}\n{GREEN}{home}{RESET}")
 
-    usuario, contraseña = get_next_credential()
-    print(f"{BLUE}Using credentials for user: {usuario}{RESET}")
-
-    # Store credentials in client for auto re-login
-    client.username = usuario
-    client.password = contraseña
-
-    setup_user_file_logger(usuario)
-
-    print("Attempting to log in, please wait...")
-    login_resp = client.login(usuario, contraseña)
-    if not login_resp:
-        print(f"{RED}Login error: Please verify your credentials.{RESET}")
-        logging.error("Login failed for user: %s", usuario)
+    # 2) Credentials & login
+    user, pwd = get_next_credential()
+    client.username, client.password = user, pwd
+    print(f"{BLUE}Using credentials for user: {user}{RESET}")
+    setup_user_file_logger(user)
+    print("Logging in...")
+    if not client.login(user, pwd):
+        print(f"{RED}Login failed.{RESET}")
+        logging.error("Login failed for %s", user)
         sys.exit(1)
     print(f"{GREEN}Login successful!{RESET}")
-    logging.info("Login successful for user: %s", usuario)
+    logging.info("User %s logged in", user)
 
-    # Start subscription listening in the background (thread is daemon)
-    listener_thread = threading.Thread(target=listen_subscriptions, args=(client,), daemon=True)
-    listener_thread.start()
+    # 3) Start listener thread
+    threading.Thread(target=listen_subscriptions, args=(client,), daemon=True).start()
 
-    # Determine the actions file path (per-user)
-    actions_dir = "actions"
-    if not os.path.exists(actions_dir):
-        os.makedirs(actions_dir)
-    actions_file = os.path.join(actions_dir, f"{usuario}.txt")
-    if not os.path.exists(actions_file):
-        logging.info("Actions file '%s' not found; creating an empty file.", actions_file)
-        with open(actions_file, "w") as f:
-            pass
-        print(f"{YELLOW}Actions file created: {actions_file}{RESET}")
+    # 4) Ensure actions file exists
+    os.makedirs(ACTIONS_DIR, exist_ok=True)
+    path = os.path.join(ACTIONS_DIR, f"{user}.txt")
+    if not os.path.exists(path):
+        open(path, "w").close()
+        print(f"{YELLOW}Created actions file: {path}{RESET}")
+        logging.info("Created actions file %s", path)
 
-    print(f"\nStarting to process actions from '{actions_file}'...")
-    logging.info("Processing actions from '%s'", actions_file)
-    process_actions_file(actions_file, client)
+    # 5) Process actions until 'close'
+    print(f"\nProcessing actions in '{path}'...")
+    process_actions_file(path, client)
 
     print(f"{GREEN}Client terminated.{RESET}")
-    logging.info("Client terminated.")
+    logging.info("Client terminated for %s", user)
 
 if __name__ == "__main__":
     main()

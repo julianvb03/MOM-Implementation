@@ -54,7 +54,7 @@ class AuthenticationHandler:
         Returns:
             (str): JWT token.
         """
-        expiration = datetime.now(timezone.utc) + timedelta(minutes=1)
+        expiration = datetime.now(timezone.utc) + timedelta(minutes=30)
         payload = {
             "exp": expiration,
             "iat": datetime.now(timezone.utc),
