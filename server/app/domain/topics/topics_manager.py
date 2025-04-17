@@ -178,6 +178,40 @@ class MOMTopicManager:
                 # Validar existencia del tópico
                 result = self.validator.validate_topic_exists(topic_name)
                 if not result.success:
+                    # Verificamos si el tópico existe en algún nodo usando SMEMBERS
+                    nodes = ["A", "B", "C"]
+                    topic_exists_somewhere = False
+                    target_nodes = []
+
+                    for node in nodes:
+                        # Verificamos si "topic:topic_name" está en el set del nodo
+                        members = self.redis_nodes.smembers(node)
+                        if f"topic:{topic_name}" in members:
+                            topic_exists_somewhere = True
+                            target_nodes.append(node)
+
+                    if not topic_exists_somewhere:
+                        return TopicOperationResult(
+                            success=False,
+                            status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                            details="El tópico no existe en ningún nodo",
+                            replication_result=False
+                        )
+
+                    # Si el tópico existe en algún nodo, intentamos el forward
+                    nodes.remove(WHOAMI)
+                    for node in nodes:
+                        if node in target_nodes:  # Solo intentamos forward a nodos donde sabemos que existe el tópico
+                            result = self.replication_client.forward_publish(
+                                topic_name=topic_name,
+                                user=self.user,
+                                message=message,
+                                node=node
+                            )
+                            if result.success:
+                                return result
+
+                    result.success = False
                     result.replication_result = False
                     return result
 
@@ -290,13 +324,43 @@ class MOMTopicManager:
         """
         try:
             metadata_key = TopicKeyBuilder.metadata_key(topic_name)
-            if not self.redis.exists(metadata_key):
-                return TopicOperationResult(
-                    success=False,
-                    status=MOMTopicStatus.TOPIC_NOT_EXIST,
-                    details="Topic does not exist",
-                    replication_result=False
-                )
+            result = self.validator.validate_topic_exists(topic_name)
+            if not result.success:
+                # Verificamos si el tópico existe en algún nodo usando SMEMBERS
+                nodes = ["A", "B", "C"]
+                topic_exists_somewhere = False
+                target_nodes = []
+
+                for node in nodes:
+                    # Verificamos si "topic:topic_name" está en el set del nodo
+                    members = self.redis_nodes.smembers(node)
+                    if f"topic:{topic_name}" in members:
+                        topic_exists_somewhere = True
+                        target_nodes.append(node)
+
+                if not topic_exists_somewhere:
+                    return TopicOperationResult(
+                        success=False,
+                        status=MOMTopicStatus.TOPIC_NOT_EXIST,
+                        details="El tópico no existe en ningún nodo",
+                        replication_result=False
+                    )
+
+                # Si el tópico existe en algún nodo, intentamos el forward
+                nodes.remove(WHOAMI)
+                for node in nodes:
+                    if node in target_nodes:  # Solo intentamos forward a nodos donde sabemos que existe el tópico
+                        result = self.replication_client.forward_consume(
+                            topic_name=topic_name,
+                            user=self.user,
+                            node=node
+                        )
+                        if result.success:
+                            return result
+
+                result.success = False
+                result.replication_result = False
+                return result
                 
             subscribers_key = TopicKeyBuilder.subscribers_key(topic_name)
             if not self.redis.sismember(subscribers_key, self.user):

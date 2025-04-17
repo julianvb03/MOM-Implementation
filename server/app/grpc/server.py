@@ -325,6 +325,191 @@ class TopicReplicationServicer(replication_service_pb2_grpc.TopicReplicationServ
                 success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
+    def TopicReplicateForwardPublishMessage(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.publisher)
+            result = topic_manager.publish(
+                message=request.message,
+                topic_name=request.topic_name,
+                im_replicating=False,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully published to topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardPublishMessage")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def TopicReplicateForwardConsumeMessage(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.subscriber)
+            result = topic_manager.consume(
+                topic_name=request.topic_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully consumed from topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardConsumeMessage")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def TopicReplicateForwardSubscribe(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.subscriber)
+            result = topic_manager.subscriptions.subscribe(
+                topic_name=request.topic_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully subscribed to topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardSubscribe")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+
+    def TopicReplicateForwardUnsubscribe(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            topic_manager = MOMTopicManager(db, request.subscriber)
+            result = topic_manager.subscriptions.unsubscribe(
+                topic_name=request.topic_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully unsubscribed from topic",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en TopicReplicateForwardUnsubscribe")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
 
 class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServicer): # pylint: disable=C0301
     """
@@ -399,6 +584,10 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
 
             # Eliminar todas las claves relacionadas con la cola
             db.delete(queue_key, metadata_key, subscribers_key)
+            nodes = ["A", "B", "C"]
+            db_nodes = ObjectFactory.get_instance(Database, ObjectFactory.NODES_DATABASE).get_client()
+            for node in nodes:
+                db_nodes.srem(node, f"queue:{request.queue_name}")
 
             return ReplicationResponse(
                 success=True,
@@ -618,6 +807,184 @@ class QueueReplicationServicer(replication_service_pb2_grpc.QueueReplicationServ
                 success=False, status_code=StatusCode.REPLICATION_FAILED, message=str(e) # pylint: disable=C0301
             )
 
+    def QueueReplicateForwardEnqueue(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            queue_manager = MOMQueueManager(db, request.publisher)
+            result = queue_manager.enqueue(
+                message=request.message,
+                queue_name=request.queue_name,
+                im_replicating=False,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message="Message enqueued successfully",
+            )
+        except Exception as e: # pylint: disable=W0703
+            logger.exception("Error inesperado en QueueReplicateForwardEnqueue")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e) # pylint: disable=C0301
+            )
+            
+    def QueueReplicateForwardDequeue(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            queue_manager = MOMQueueManager(db, request.subscriber)
+            result = queue_manager.dequeue(
+                queue_name=request.queue_name,
+                im_replicating=False,
+                endpoint=True
+            )
+            
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=result.details,
+            )
+        except Exception as e: # pylint: disable=W0703
+            logger.exception("Error inesperado en QueueReplicateForwardDequeue")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e) # pylint: disable=C0301
+            )
+        
+    def QueueReplicateForwardSubscribe(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            queue_manager = MOMQueueManager(db, request.subscriber)
+            result = queue_manager.subscriptions.subscribe(
+                queue_name=request.queue_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully subscribed to queue",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en QueueReplicateForwardSubscribe")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
+        
+    def QueueReplicateForwardUnsubscribe(self, request, context):
+        try:
+            db = create_redis2_connection()
+            if db is None:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("Redis connection failed")
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message="Redis connection failed",
+                )
+            
+            queue_manager = MOMQueueManager(db, request.subscriber)
+            result = queue_manager.subscriptions.unsubscribe(
+                queue_name=request.queue_name,
+                endpoint=True
+            )
+
+            if not result.success:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(result.status.value)
+                return ReplicationResponse(
+                    success=False,
+                    status_code=StatusCode.REPLICATION_FAILED,
+                    message=result.status.value,
+                )
+            
+            return ReplicationResponse(
+                success=True,
+                status_code=StatusCode.REPLICATION_SUCCESS,
+                message=json.dumps({
+                    "success": True,
+                    "message": "Successfully unsubscribed from queue",
+                    "details": result.details
+                })
+            )
+        except Exception as e:
+            logger.exception("Error inesperado en QueueReplicateForwardUnsubscribe")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ReplicationResponse(
+                success=False,
+                status_code=StatusCode.REPLICATION_FAILED,
+                message=str(e)
+            )
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
